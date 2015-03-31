@@ -536,7 +536,7 @@ namespace MimeKit.Utils {
 		/// <paramref name="startIndex"/> and <paramref name="length"/> do not specify
 		/// a valid range in the byte array.
 		/// </exception>
-		public static bool TryParseDateTime (byte[] buffer, int startIndex, int length, out DateTimeOffset date)
+		public static bool TryParse (byte[] buffer, int startIndex, int length, out DateTimeOffset date)
 		{
 			if (buffer == null)
 				throw new ArgumentNullException ("buffer");
@@ -547,6 +547,69 @@ namespace MimeKit.Utils {
 			if (length < 0 || length > (buffer.Length - startIndex))
 				throw new ArgumentOutOfRangeException ("length");
 
+			var tokens = new List<DateToken> (TokenizeDate (buffer, startIndex, length));
+
+			if (TryParseStandardDateFormat (tokens, buffer, out date))
+				return true;
+
+			if (TryParseUnknownDateFormat (tokens, buffer, out date))
+				return true;
+
+			date = new DateTimeOffset ();
+
+			return false;
+		}
+
+		/// <summary>
+		/// Tries to parse the given input buffer into a new <see cref="System.DateTimeOffset"/> instance.
+		/// </summary>
+		/// <remarks>
+		/// Parses an rfc822 date and time from the supplied buffer starting at the given index
+		/// and spanning across the specified number of bytes.
+		/// </remarks>
+		/// <returns><c>true</c>, if the date was successfully parsed, <c>false</c> otherwise.</returns>
+		/// <param name="buffer">The input buffer.</param>
+		/// <param name="startIndex">The starting index of the input buffer.</param>
+		/// <param name="length">The number of bytes in the input buffer to parse.</param>
+		/// <param name="date">The parsed date.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="buffer"/> is <c>null</c>.
+		/// </exception>
+		/// <exception cref="System.ArgumentOutOfRangeException">
+		/// <paramref name="startIndex"/> and <paramref name="length"/> do not specify
+		/// a valid range in the byte array.
+		/// </exception>
+		[Obsolete ("Use TryParse (byte[] buffer, int startIndex, int length, out DateTimeOffset date) instead.")]
+		public static bool TryParseDateTime (byte[] buffer, int startIndex, int length, out DateTimeOffset date)
+		{
+			return TryParse (buffer, startIndex, length, out date);
+		}
+
+		/// <summary>
+		/// Tries to parse the given input buffer into a new <see cref="System.DateTimeOffset"/> instance.
+		/// </summary>
+		/// <remarks>
+		/// Parses an rfc822 date and time from the supplied buffer starting at the specified index.
+		/// </remarks>
+		/// <returns><c>true</c>, if the date was successfully parsed, <c>false</c> otherwise.</returns>
+		/// <param name="buffer">The input buffer.</param>
+		/// <param name="startIndex">The starting index of the input buffer.</param>
+		/// <param name="date">The parsed date.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="buffer"/> is <c>null</c>.
+		/// </exception>
+		/// <exception cref="System.ArgumentOutOfRangeException">
+		/// <paramref name="startIndex"/> is not within the range of the byte array.
+		/// </exception>
+		public static bool TryParse (byte[] buffer, int startIndex, out DateTimeOffset date)
+		{
+			if (buffer == null)
+				throw new ArgumentNullException ("buffer");
+
+			if (startIndex < 0 || startIndex > buffer.Length)
+				throw new ArgumentOutOfRangeException ("startIndex");
+
+			int length = buffer.Length - startIndex;
 			var tokens = new List<DateToken> (TokenizeDate (buffer, startIndex, length));
 
 			if (TryParseStandardDateFormat (tokens, buffer, out date))
@@ -576,16 +639,30 @@ namespace MimeKit.Utils {
 		/// <exception cref="System.ArgumentOutOfRangeException">
 		/// <paramref name="startIndex"/> is not within the range of the byte array.
 		/// </exception>
+		[Obsolete ("Use TryParse (byte[] buffer, int startIndex, out DateTimeOffset date) instead.")]
 		public static bool TryParseDateTime (byte[] buffer, int startIndex, out DateTimeOffset date)
+		{
+			return TryParse (buffer, startIndex, out date);
+		}
+
+		/// <summary>
+		/// Tries to parse the given input buffer into a new <see cref="System.DateTimeOffset"/> instance.
+		/// </summary>
+		/// <remarks>
+		/// Parses an rfc822 date and time from the specified buffer.
+		/// </remarks>
+		/// <returns><c>true</c>, if the date was successfully parsed, <c>false</c> otherwise.</returns>
+		/// <param name="buffer">The input buffer.</param>
+		/// <param name="date">The parsed date.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="buffer"/> is <c>null</c>.
+		/// </exception>
+		public static bool TryParse (byte[] buffer, out DateTimeOffset date)
 		{
 			if (buffer == null)
 				throw new ArgumentNullException ("buffer");
 
-			if (startIndex < 0 || startIndex > buffer.Length)
-				throw new ArgumentOutOfRangeException ("startIndex");
-
-			int length = buffer.Length - startIndex;
-			var tokens = new List<DateToken> (TokenizeDate (buffer, startIndex, length));
+			var tokens = new List<DateToken> (TokenizeDate (buffer, 0, buffer.Length));
 
 			if (TryParseStandardDateFormat (tokens, buffer, out date))
 				return true;
@@ -610,11 +687,30 @@ namespace MimeKit.Utils {
 		/// <exception cref="System.ArgumentNullException">
 		/// <paramref name="buffer"/> is <c>null</c>.
 		/// </exception>
+		[Obsolete ("Use TryParse (byte[] buffer, out DateTimeOffset date) instead.")]
 		public static bool TryParseDateTime (byte[] buffer, out DateTimeOffset date)
 		{
-			if (buffer == null)
-				throw new ArgumentNullException ("buffer");
+			return TryParse (buffer, out date);
+		}
 
+		/// <summary>
+		/// Tries to parse the given input buffer into a new <see cref="System.DateTimeOffset"/> instance.
+		/// </summary>
+		/// <remarks>
+		/// Parses an rfc822 date and time from the specified text.
+		/// </remarks>
+		/// <returns><c>true</c>, if the date was successfully parsed, <c>false</c> otherwise.</returns>
+		/// <param name="text">The input text.</param>
+		/// <param name="date">The parsed date.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="text"/> is <c>null</c>.
+		/// </exception>
+		public static bool TryParse (string text, out DateTimeOffset date)
+		{
+			if (text == null)
+				throw new ArgumentNullException ("text");
+
+			var buffer = Encoding.UTF8.GetBytes (text);
 			var tokens = new List<DateToken> (TokenizeDate (buffer, 0, buffer.Length));
 
 			if (TryParseStandardDateFormat (tokens, buffer, out date))
@@ -640,23 +736,53 @@ namespace MimeKit.Utils {
 		/// <exception cref="System.ArgumentNullException">
 		/// <paramref name="text"/> is <c>null</c>.
 		/// </exception>
+		[Obsolete ("Use TryParse (string text, out DateTimeOffset date) instead.")]
 		public static bool TryParseDateTime (string text, out DateTimeOffset date)
 		{
-			if (text == null)
-				throw new ArgumentNullException ("text");
+			return TryParse (text, out date);
+		}
 
-			var buffer = Encoding.UTF8.GetBytes (text);
-			var tokens = new List<DateToken> (TokenizeDate (buffer, 0, buffer.Length));
+		// Note: this method exists because BouncyCastle's DerUtcTime.ParseDateString() fails
+		// to parse date strings where the seconds value is not in the range 0 -> 59.
+		// See https://github.com/jstedfast/MimeKit/issues/103 for details.
+		internal static DateTime Parse (string text, string format)
+		{
+			int hour = 0, minute = 0, second = 0;
+			int year = 0, month = 0, day = 0;
+			TimeSpan offset;
+			int timezone;
+			int i = 0;
 
-			if (TryParseStandardDateFormat (tokens, buffer, out date))
-				return true;
+			while (i < text.Length && i < format.Length && format[i] != 'z') {
+				if (text[i] < '0' || text[i] > '9')
+					throw new FormatException ();
 
-			if (TryParseUnknownDateFormat (tokens, buffer, out date))
-				return true;
+				int digit = text[i] - '0';
 
-			date = new DateTimeOffset ();
+				switch (format[i]) {
+				case 'y': year = (year * 10) + digit; break;
+				case 'M': month = (month * 10) + digit; break;
+				case 'd': day = (day * 10) + digit; break;
+				case 'H': hour = (hour * 10) + digit; break;
+				case 'm': minute = (minute * 10) + digit; break;
+				case 's': second = (second * 10) + digit; break;
+				}
 
-			return false;
+				i++;
+			}
+
+			minute += second / 60;
+			second = second % 60;
+
+			hour += minute / 60;
+			minute = minute % 60;
+
+			if (!timezones.TryGetValue (text.Substring (i), out timezone))
+				timezone = 0;
+
+			offset = new TimeSpan (timezone / 100, timezone % 100, 0);
+
+			return new DateTime (year, month, day, hour, minute, second, DateTimeKind.Utc).Add (offset);
 		}
 
 		/// <summary>

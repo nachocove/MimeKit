@@ -196,33 +196,43 @@ namespace UnitTests {
 		}
 
 		[Test]
-		public void TestMultipleParametersWithIdenticalNames ()
+		public void TestUnquotedParameter ()
 		{
-			ContentDisposition disposition;
+			const string text = "application/octet-stream; name=Test;";
+			ContentType type;
 
-			const string text1 = "inline;\n filename=\"Filename.doc\";\n filename*0*=UTF-8''UnicodeFile;\n filename*1*=name.doc";
-			Assert.IsTrue (ContentDisposition.TryParse (text1, out disposition), "Failed to parse first Content-Disposition");
-			Assert.AreEqual ("UnicodeFilename.doc", disposition.FileName, "The first filename value does not match.");
-
-			const string text2 = "inline;\n filename*0*=UTF-8''UnicodeFile;\n filename*1*=name.doc;\n filename=\"Filename.doc\"";
-			Assert.IsTrue (ContentDisposition.TryParse (text2, out disposition), "Failed to parse second Content-Disposition");
-			Assert.AreEqual ("UnicodeFilename.doc", disposition.FileName, "The second filename value does not match.");
-
-			const string text3 = "inline;\n filename*0*=UTF-8''UnicodeFile;\n filename=\"Filename.doc\";\n filename*1*=name.doc";
-			Assert.IsTrue (ContentDisposition.TryParse (text3, out disposition), "Failed to parse third Content-Disposition");
-			Assert.AreEqual ("UnicodeFilename.doc", disposition.FileName, "The third filename value does not match.");
+			Assert.IsTrue (ContentType.TryParse (text, out type), "Failed to parse: {0}", text);
+			Assert.AreEqual (type.MediaType, "application", "Media type does not match: {0}", text);
+			Assert.AreEqual (type.MediaSubtype, "octet-stream", "Media subtype does not match: {0}", text);
+			Assert.IsNotNull (type.Parameters, "Parameter list is null: {0}", text);
+			Assert.IsTrue (type.Parameters.Contains ("name"), "Parameter list does not contain name param: {0}", text);
+			Assert.AreEqual (type.Parameters["name"], "Test", "name values do not match: {0}", text);
 		}
 
 		[Test]
-		public void TestMistakenlyQuotedEncodedParameterValues ()
+		public void TestUnquotedParameterWithSpaces ()
 		{
-			const string text = "attachment;\n filename*0*=\"ISO-8859-2''%C8%50%50%20%2D%20%BE%E1%64%6F%73%74%20%6F%20%61%6B%63%65\";\n " +
-				"filename*1*=\"%70%74%61%63%69%20%73%6D%6C%6F%75%76%79%20%31%32%2E%31%32%2E\";\n " +
-				"filename*2*=\"%64%6F%63\"";
-			ContentDisposition disposition;
+			const string text = "application/octet-stream; name=Test Name.pdf;";
+			var options = ParserOptions.Default.Clone ();
+			var buffer = Encoding.ASCII.GetBytes (text);
+			ContentType type;
 
-			Assert.IsTrue (ContentDisposition.TryParse (text, out disposition), "Failed to parse Content-Disposition");
-			Assert.AreEqual ("ČPP - žádost o akceptaci smlouvy 12.12.doc", disposition.FileName, "The filename value does not match.");
+			// it should fail using the strict parser...
+			options.ParameterComplianceMode = RfcComplianceMode.Strict;
+			Assert.IsFalse (ContentType.TryParse (options, buffer, out type), "Should not have parsed (strict mode): {0}", text);
+			// however, it should preserve at least the type/subtype info... (I call this a feature!)
+			Assert.IsNotNull (type, "Even though parsing failed, the content type should not be null.");
+			Assert.AreEqual (type.MediaType, "application", "Media type does not match: {0}", text);
+			Assert.AreEqual (type.MediaSubtype, "octet-stream", "Media subtype does not match: {0}", text);
+
+			// it *should* pass with the loose parser
+			options.ParameterComplianceMode = RfcComplianceMode.Loose;
+			Assert.IsTrue (ContentType.TryParse (options, buffer, out type), "Failed to parse: {0}", text);
+			Assert.AreEqual (type.MediaType, "application", "Media type does not match: {0}", text);
+			Assert.AreEqual (type.MediaSubtype, "octet-stream", "Media subtype does not match: {0}", text);
+			Assert.IsNotNull (type.Parameters, "Parameter list is null: {0}", text);
+			Assert.IsTrue (type.Parameters.Contains ("name"), "Parameter list does not contain name param: {0}", text);
+			Assert.AreEqual (type.Parameters["name"], "Test Name.pdf", "name values do not match: {0}", text);
 		}
 	}
 }

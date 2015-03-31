@@ -202,6 +202,24 @@ namespace MimeKit {
 		/// Initializes a new instance of the <see cref="MimeKit.MimeMessage"/> class.
 		/// </summary>
 		/// <remarks>
+		/// Creates a new MIME message, specifying details at creation time.
+		/// </remarks>
+		/// <param name="from">The list of addresses in the From header.</param>
+		/// <param name="to">The list of addresses in the To header.</param>
+		/// <param name="subject">The subject of the message.</param>
+		/// <param name="body">The body of the message.</param>
+		public MimeMessage (IEnumerable<InternetAddress> from, IEnumerable<InternetAddress> to, string subject, MimeEntity body) : this ()
+		{
+			From.AddRange (from);
+			To.AddRange (to);
+			Subject = subject;
+			Body = body;
+		}
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="MimeKit.MimeMessage"/> class.
+		/// </summary>
+		/// <remarks>
 		/// Creates a new MIME message.
 		/// </remarks>
 		public MimeMessage () : this (ParserOptions.Default.Clone ())
@@ -660,14 +678,14 @@ namespace MimeKit {
 			// walk the multipart/alternative children backwards from greatest level of faithfulness to the least faithful
 			for (int i = multipart.Count - 1; i >= 0; i--) {
 				var related = multipart[i] as MultipartRelated;
-				TextPart part;
+				TextPart text;
 
 				if (related != null) {
-					part = related.Root as TextPart;
+					text = related.Root as TextPart;
 				} else {
 					var mpart = multipart[i] as Multipart;
 
-					part = multipart[i] as TextPart;
+					text = multipart[i] as TextPart;
 
 					if (mpart != null && mpart.ContentType.Matches ("multipart", "alternative")) {
 						// Note: nested multipart/alternatives make no sense... yet here we are.
@@ -676,8 +694,8 @@ namespace MimeKit {
 					}
 				}
 
-				if (part != null && (html ? part.IsHtml : part.IsPlain)) {
-					body = part.Text;
+				if (text != null && (html ? text.IsHtml : text.IsPlain)) {
+					body = text.Text;
 					return true;
 				}
 			}
@@ -690,7 +708,8 @@ namespace MimeKit {
 		static bool TryGetMessageBody (Multipart multipart, bool html, out string body)
 		{
 			var related = multipart as MultipartRelated;
-			TextPart part;
+			Multipart multi;
+			TextPart text;
 
 			if (related == null) {
 				if (multipart.ContentType.Matches ("multipart", "alternative"))
@@ -698,7 +717,7 @@ namespace MimeKit {
 
 				// Note: This is probably a multipart/mixed... and if not, we can still treat it like it is.
 				for (int i = 0; i < multipart.Count; i++) {
-					var multi = multipart[i] as Multipart;
+					multi = multipart[i] as Multipart;
 
 					// descend into nested multiparts, if there are any...
 					if (multi != null) {
@@ -709,13 +728,13 @@ namespace MimeKit {
 						break;
 					}
 
-					part = multipart[i] as TextPart;
+					text = multipart[i] as TextPart;
 
 					// Look for the first non-attachment text part (realistically, the body text will
 					// preceed any attachments, but I'm not sure we can rely on that assumption).
-					if (part != null && !part.IsAttachment) {
-						if (html ? part.IsHtml : part.IsPlain) {
-							body = part.Text;
+					if (text != null && !text.IsAttachment) {
+						if (html ? text.IsHtml : text.IsPlain) {
+							body = text.Text;
 							return true;
 						}
 
@@ -726,18 +745,20 @@ namespace MimeKit {
 				}
 			} else {
 				// Note: If the multipart/related root document is HTML, then this is the droid we are looking for.
-				part = related.Root as TextPart;
+				var root = related.Root;
 
-				if (part != null) {
-					body = (html ? part.IsHtml : part.IsPlain) ? part.Text : null;
+				text = root as TextPart;
+
+				if (text != null) {
+					body = (html ? text.IsHtml : text.IsPlain) ? text.Text : null;
 					return body != null;
 				}
 
 				// maybe the root is another multipart (like multipart/alternative)?
-				var root = related.Root as Multipart;
+				multi = root as Multipart;
 
-				if (root != null)
-					return TryGetMessageBody (root, html, out body);
+				if (multi != null)
+					return TryGetMessageBody (multi, html, out body);
 			}
 
 			body = null;
@@ -763,10 +784,10 @@ namespace MimeKit {
 					if (TryGetMessageBody (multipart, false, out plain))
 						return plain;
 				} else {
-					var part = Body as TextPart;
+					var text = Body as TextPart;
 
-					if (part != null && part.IsPlain)
-						return part.Text;
+					if (text != null && text.IsPlain)
+						return text.Text;
 				}
 
 				return null;
@@ -790,10 +811,10 @@ namespace MimeKit {
 					if (TryGetMessageBody (multipart, true, out html))
 						return html;
 				} else {
-					var part = Body as TextPart;
+					var text = Body as TextPart;
 
-					if (part != null && part.IsHtml)
-						return part.Text;
+					if (text != null && text.IsHtml)
+						return text.Text;
 				}
 
 				return null;
@@ -821,8 +842,10 @@ namespace MimeKit {
 			if (msgpart != null) {
 				var message = msgpart.Message;
 
-				foreach (var part in EnumerateMimeParts (message.Body))
-					yield return part;
+				if (message != null) {
+					foreach (var part in EnumerateMimeParts (message.Body))
+						yield return part;
+				}
 
 				yield break;
 			}
@@ -834,7 +857,7 @@ namespace MimeKit {
 		/// Gets the body parts of the message.
 		/// </summary>
 		/// <remarks>
-		/// Traverses over the MIME tree, enumerating all  of the <see cref="MimePart"/> objects.
+		/// Traverses over the MIME tree, enumerating all of the <see cref="MimePart"/> objects.
 		/// </remarks>
 		/// <value>The body parts.</value>
 		public IEnumerable<MimePart> BodyParts {
@@ -857,13 +880,43 @@ namespace MimeKit {
 		/// Returns a <see cref="System.String"/> that represents the current <see cref="MimeKit.MimeMessage"/>.
 		/// </summary>
 		/// <remarks>
-		/// Returns a <see cref="System.String"/> that represents the current <see cref="MimeKit.MimeMessage"/>.
+		/// <para>Returns a <see cref="System.String"/> that represents the current <see cref="MimeKit.MimeMessage"/>.</para>
+		/// <para>Note: In general, the string returned from this method should not be used for serializing the message
+		/// to disk. Instead, it is recommended that you use <see cref="WriteTo(Stream,CancellationToken)"/> instead.</para>
 		/// </remarks>
 		/// <returns>A <see cref="System.String"/> that represents the current <see cref="MimeKit.MimeMessage"/>.</returns>
 		public override string ToString ()
 		{
+			bool isUnicodeSafe = true;
+
+			if (Body != null) {
+				foreach (var part in BodyParts) {
+					if (part.ContentTransferEncoding == ContentEncoding.Binary) {
+						isUnicodeSafe = false;
+						break;
+					}
+
+					var text = part as TextPart;
+
+					if (text != null) {
+						var charset = text.ContentType.Charset;
+
+						charset = charset != null ? charset.ToLowerInvariant () : "utf-8";
+
+						if (charset == "utf-8" && charset == "us-ascii")
+							continue;
+
+						isUnicodeSafe = false;
+						break;
+					}
+				}
+			}
+
 			using (var memory = new MemoryStream ()) {
-				WriteTo (memory);
+				var options = FormatOptions.Default.Clone ();
+				options.International = false;
+
+				WriteTo (options, memory);
 
 				#if !PORTABLE
 				var buffer = memory.GetBuffer ();
@@ -871,6 +924,9 @@ namespace MimeKit {
 				var buffer = memory.ToArray ();
 				#endif
 				int count = (int) memory.Length;
+
+				if (isUnicodeSafe)
+					return CharsetUtils.UTF8.GetString (buffer, 0, count);
 
 				return CharsetUtils.Latin1.GetString (buffer, 0, count);
 			}
@@ -926,9 +982,7 @@ namespace MimeKit {
 						if (options.HiddenHeaders.Contains (header.Id))
 							continue;
 
-						var name = Encoding.ASCII.GetBytes (header.Field);
-
-						filtered.Write (name, 0, name.Length, cancellationToken);
+						filtered.Write (header.RawField, 0, header.RawField.Length, cancellationToken);
 						filtered.Write (new [] { (byte) ':' }, 0, 1, cancellationToken);
 						filtered.Write (header.RawValue, 0, header.RawValue.Length, cancellationToken);
 					}
@@ -1541,7 +1595,7 @@ namespace MimeKit {
 
 				switch (id) {
 				case HeaderId.MimeVersion:
-					if (MimeUtils.TryParseVersion (rawValue, 0, rawValue.Length, out version))
+					if (MimeUtils.TryParse (rawValue, 0, rawValue.Length, out version))
 						return;
 					break;
 				case HeaderId.References:
@@ -1576,11 +1630,11 @@ namespace MimeKit {
 						return;
 					break;
 				case HeaderId.ResentDate:
-					if (DateUtils.TryParseDateTime (rawValue, 0, rawValue.Length, out resentDate))
+					if (DateUtils.TryParse (rawValue, 0, rawValue.Length, out resentDate))
 						return;
 					break;
 				case HeaderId.Date:
-					if (DateUtils.TryParseDateTime (rawValue, 0, rawValue.Length, out date))
+					if (DateUtils.TryParse (rawValue, 0, rawValue.Length, out date))
 						return;
 					break;
 				}
@@ -1605,7 +1659,7 @@ namespace MimeKit {
 
 				switch (e.Header.Id) {
 				case HeaderId.MimeVersion:
-					MimeUtils.TryParseVersion (rawValue, 0, rawValue.Length, out version);
+					MimeUtils.TryParse (rawValue, 0, rawValue.Length, out version);
 					break;
 				case HeaderId.References:
 					references.Changed -= ReferencesChanged;
@@ -1631,10 +1685,10 @@ namespace MimeKit {
 						sender = address as MailboxAddress;
 					break;
 				case HeaderId.ResentDate:
-					DateUtils.TryParseDateTime (rawValue, 0, rawValue.Length, out resentDate);
+					DateUtils.TryParse (rawValue, 0, rawValue.Length, out resentDate);
 					break;
 				case HeaderId.Date:
-					DateUtils.TryParseDateTime (rawValue, 0, rawValue.Length, out date);
+					DateUtils.TryParse (rawValue, 0, rawValue.Length, out date);
 					break;
 				}
 				break;
@@ -1962,26 +2016,34 @@ namespace MimeKit {
 			var msg = new MimeMessage (ParserOptions.Default, headers);
 			MimeEntity body = null;
 
-			if (message.Sender != null)
+			// Note: If the user has already sent their MailMessage via System.Net.Mail.SmtpClient,
+			// then the following MailMessage properties will have been merged into the Headers, so
+			// check to make sure our MimeMessage properties are empty before adding them.
+			if (msg.Sender == null && message.Sender != null)
 				msg.Sender = (MailboxAddress) message.Sender;
-			if (message.From != null)
+			if (msg.From.Count == 0 && message.From != null)
 				msg.From.Add ((MailboxAddress) message.From);
-			msg.ReplyTo.AddRange ((InternetAddressList) message.ReplyToList);
-			msg.To.AddRange ((InternetAddressList) message.To);
-			msg.Cc.AddRange ((InternetAddressList) message.CC);
-			msg.Bcc.AddRange ((InternetAddressList) message.Bcc);
-			msg.Subject = message.Subject ?? string.Empty;
+			if (msg.ReplyTo.Count == 0)
+				msg.ReplyTo.AddRange ((InternetAddressList) message.ReplyToList);
+			if (msg.To.Count == 0)
+				msg.To.AddRange ((InternetAddressList) message.To);
+			if (msg.Cc.Count == 0)
+				msg.Cc.AddRange ((InternetAddressList) message.CC);
+			if (msg.Bcc.Count == 0)
+				msg.Bcc.AddRange ((InternetAddressList) message.Bcc);
+			if (string.IsNullOrEmpty (msg.Subject))
+				msg.Subject = message.Subject ?? string.Empty;
 
 			switch (message.Priority) {
 			case MailPriority.High:
-				msg.Headers.Add (HeaderId.Priority, "urgent");
-				msg.Headers.Add (HeaderId.Importance, "high");
-				msg.Headers.Add ("X-Priority", "1");
+				msg.Headers.Replace (HeaderId.Priority, "urgent");
+				msg.Headers.Replace (HeaderId.Importance, "high");
+				msg.Headers.Replace ("X-Priority", "1");
 				break;
 			case MailPriority.Low:
-				msg.Headers.Add (HeaderId.Priority, "non-urgent");
-				msg.Headers.Add (HeaderId.Importance, "low");
-				msg.Headers.Add ("X-Priority", "5");
+				msg.Headers.Replace (HeaderId.Priority, "non-urgent");
+				msg.Headers.Replace (HeaderId.Importance, "low");
+				msg.Headers.Replace ("X-Priority", "5");
 				break;
 			}
 

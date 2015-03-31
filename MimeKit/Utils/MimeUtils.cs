@@ -27,8 +27,11 @@
 using System;
 using System.Net;
 using System.Text;
-using System.Diagnostics;
 using System.Collections.Generic;
+
+#if !PORTABLE
+using System.Security.Cryptography;
+#endif
 
 namespace MimeKit.Utils {
 	/// <summary>
@@ -39,7 +42,22 @@ namespace MimeKit.Utils {
 	/// </remarks>
 	public static class MimeUtils
 	{
+#if PORTABLE
 		static readonly Random random = new Random ((int) DateTime.Now.Ticks);
+#endif
+		const string base36 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+		internal static void GetRandomBytes (byte[] buffer)
+		{
+#if !PORTABLE
+			using (var random = new RNGCryptoServiceProvider ())
+				random.GetBytes (buffer);
+#else
+			lock (random) {
+				random.NextBytes (buffer);
+			}
+#endif
+		}
 
 		/// <summary>
 		/// Generates a Message-Id.
@@ -57,13 +75,31 @@ namespace MimeKit.Utils {
 			if (domain == null)
 				throw new ArgumentNullException ("domain");
 
-			var guid = new byte[16];
+			ulong value = (ulong) DateTime.Now.Ticks;
+			var id = new StringBuilder ();
+			var block = new byte[8];
 
-			lock (random) {
-				random.NextBytes (guid);
-			}
+			GetRandomBytes (block);
 
-			return string.Format ("{0}@{1}", new Guid (guid), domain);
+			do {
+				id.Append (base36[(int) (value % 36)]);
+				value /= 36;
+			} while (value != 0);
+
+			id.Append ('.');
+
+			value = 0;
+			for (int i = 0; i < 8; i++)
+				value = (value << 8) | (ulong) block[i];
+
+			do {
+				id.Append (base36[(int) (value % 36)]);
+				value /= 36;
+			} while (value != 0);
+
+			id.Append ('@').Append (domain);
+
+			return id.ToString ();
 		}
 
 		/// <summary>
@@ -107,7 +143,6 @@ namespace MimeKit.Utils {
 			byte[] sentinels = { (byte) '>' };
 			int endIndex = startIndex + length;
 			int index = startIndex;
-			InternetAddress addr;
 			string msgid;
 
 			if (buffer == null)
@@ -127,16 +162,62 @@ namespace MimeKit.Utils {
 					break;
 
 				if (buffer[index] == '<') {
-					if (!InternetAddress.TryParseMailbox (ParserOptions.Default, buffer, startIndex, ref index, endIndex, "", 65001, false, out addr))
+					// skip over the '<'
+					index++;
+
+					if (index >= endIndex)
 						break;
 
-					msgid = ((MailboxAddress) addr).Address;
+					string localpart;
+					if (!InternetAddress.TryParseLocalPart (buffer, ref index, endIndex, false, out localpart))
+						continue;
 
-					// Note: some message-id's are broken and in the form local-part@domain@domain
+					if (index >= endIndex)
+						break;
+
+					if (buffer[index] == (byte) '>') {
+						// The msgid token did not contain an @domain. Technically this is illegal, but for the
+						// sake of maximum compatibility, I guess we have no choice but to accept it...
+						index++;
+
+						yield return localpart;
+						continue;
+					}
+
+					if (buffer[index] != (byte) '@') {
+						// who the hell knows what we have here... ignore it and continue on?
+						continue;
+					}
+
+					// skip over the '@'
+					index++;
+
+					if (!ParseUtils.SkipCommentsAndWhiteSpace (buffer, ref index, endIndex, false))
+						break;
+
+					if (index >= endIndex)
+						break;
+
+					if (buffer[index] == (byte) '>') {
+						// The msgid token was in the form "<local-part@>". Technically this is illegal, but for
+						// the sake of maximum compatibility, I guess we have no choice but to accept it...
+						// https://github.com/jstedfast/MimeKit/issues/102
+						index++;
+
+						yield return localpart + "@";
+						continue;
+					}
+
+					string domain;
+					if (!ParseUtils.TryParseDomain (buffer, ref index, endIndex, sentinels, false, out domain))
+						continue;
+
+					msgid = localpart + "@" + domain;
+
+					// Note: some Message-Id's are broken and in the form "<local-part@domain@domain>"
 					// https://github.com/jstedfast/MailKit/issues/138
 					while (index < endIndex && buffer[index] == (byte) '@') {
 						int saved = index;
-						string domain;
 
 						index++;
 
@@ -199,7 +280,7 @@ namespace MimeKit.Utils {
 		/// <paramref name="startIndex"/> and <paramref name="length"/> do not specify
 		/// a valid range in the byte array.
 		/// </exception>
-		public static bool TryParseVersion (byte[] buffer, int startIndex, int length, out Version version)
+		public static bool TryParse (byte[] buffer, int startIndex, int length, out Version version)
 		{
 			if (buffer == null)
 				throw new ArgumentNullException ("buffer");
@@ -258,14 +339,104 @@ namespace MimeKit.Utils {
 		/// <exception cref="System.ArgumentNullException">
 		/// <paramref name="text"/> is <c>null</c>.
 		/// </exception>
-		public static bool TryParseVersion (string text, out Version version)
+		public static bool TryParse (string text, out Version version)
 		{
 			if (text == null)
 				throw new ArgumentNullException ("text");
 
 			var buffer = Encoding.UTF8.GetBytes (text);
 
-			return TryParseVersion (buffer, 0, buffer.Length, out version);
+			return TryParse (buffer, 0, buffer.Length, out version);
+		}
+
+		/// <summary>
+		/// Tries to parse a version from a header such as Mime-Version.
+		/// </summary>
+		/// <remarks>
+		/// Parses a MIME version string from the supplied buffer starting at the given index
+		/// and spanning across the specified number of bytes.
+		/// </remarks>
+		/// <returns><c>true</c>, if the version was successfully parsed, <c>false</c> otherwise.</returns>
+		/// <param name="buffer">The raw byte buffer to parse.</param>
+		/// <param name="startIndex">The index into the buffer to start parsing.</param>
+		/// <param name="length">The length of the buffer to parse.</param>
+		/// <param name="version">The parsed version.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="buffer"/> is <c>null</c>.
+		/// </exception>
+		/// <exception cref="System.ArgumentOutOfRangeException">
+		/// <paramref name="startIndex"/> and <paramref name="length"/> do not specify
+		/// a valid range in the byte array.
+		/// </exception>
+		[Obsolete ("Use TryParse (byte[] buffer, int startIndex, int length, out Version version) instead.")]
+		public static bool TryParseVersion (byte[] buffer, int startIndex, int length, out Version version)
+		{
+			return TryParse (buffer, startIndex, length, out version);
+		}
+
+		/// <summary>
+		/// Tries to parse a version from a header such as Mime-Version.
+		/// </summary>
+		/// <remarks>
+		/// Parses a MIME version string from the specified text.
+		/// </remarks>
+		/// <returns><c>true</c>, if the version was successfully parsed, <c>false</c> otherwise.</returns>
+		/// <param name="text">The text to parse.</param>
+		/// <param name="version">The parsed version.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="text"/> is <c>null</c>.
+		/// </exception>
+		[Obsolete ("Use TryParse (string text, out Version version) instead.")]
+		public static bool TryParseVersion (string text, out Version version)
+		{
+			return TryParse (text, out version);
+		}
+
+		/// <summary>
+		/// Tries to parse the value of a Content-Transfer-Encoding header.
+		/// </summary>
+		/// <remarks>
+		/// Parses a Content-Transfer-Encoding header value.
+		/// </remarks>
+		/// <returns><c>true</c>, if the encoding was successfully parsed, <c>false</c> otherwise.</returns>
+		/// <param name="text">The text to parse.</param>
+		/// <param name="encoding">The parsed encoding.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="text"/> is <c>null</c>.
+		/// </exception>
+		public static bool TryParse (string text, out ContentEncoding encoding)
+		{
+			if (text == null)
+				throw new ArgumentNullException ("text");
+
+			var value = new char[text.Length];
+			int i = 0, n = 0;
+			string name;
+
+			// trim leading whitespace
+			while (i < text.Length && char.IsWhiteSpace (text[i]))
+				i++;
+
+			// copy the encoding name
+			// Note: Google Docs tacks a ';' on the end... *sigh*
+			// See https://github.com/jstedfast/MimeKit/issues/106 for an example.
+			while (i < text.Length && text[i] != ';' && !char.IsWhiteSpace (text[i]))
+				value[n++] = char.ToLowerInvariant (text[i++]);
+
+			name = new string (value, 0, n);
+
+			switch (name) {
+			case "7bit":             encoding = ContentEncoding.SevenBit; break;
+			case "8bit":             encoding = ContentEncoding.EightBit; break;
+			case "binary":           encoding = ContentEncoding.Binary; break;
+			case "base64":           encoding = ContentEncoding.Base64; break;
+			case "quoted-printable": encoding = ContentEncoding.QuotedPrintable; break;
+			case "x-uuencode":       encoding = ContentEncoding.UUEncode; break;
+			case "uuencode":         encoding = ContentEncoding.UUEncode; break;
+			default:                 encoding = ContentEncoding.Default; break;
+			}
+
+			return encoding != ContentEncoding.Default;
 		}
 
 		/// <summary>
@@ -285,7 +456,7 @@ namespace MimeKit.Utils {
 			if (text == null)
 				throw new ArgumentNullException ("text");
 
-			var quoted = new StringBuilder ();
+			var quoted = new StringBuilder (text.Length + 2, (text.Length * 2) + 2);
 
 			quoted.Append ("\"");
 			for (int i = 0; i < text.Length; i++) {

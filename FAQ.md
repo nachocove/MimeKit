@@ -1,6 +1,15 @@
-## Frequently Asked Questions
+# Frequently Asked Questions
 
-### How do I get the message body text?
+## Question Index
+
+* [How do I get the message body text?](#MessageBody)
+* [How do I get the email addresses in the From, To, and Cc headers?](#AddressHeaders)
+* [How do I decrypt PGP messages that are embedded in the main message text?](#DecryptInlinePGP)
+* [How would I parse multipart/form-data from an HTTP web request?](#ParseWebRequestFormData)
+
+### <a name="MessageBody">How do I get the message body text?</a>
+
+(Note: for the TL;DR version, skip to [the end](#MessageBodyTLDR))
 
 MIME is a tree structure of parts. There are multiparts which contain other parts (even other multiparts).
 There are message parts which contain messages. And finally, there are leaf-node parts which contain content.
@@ -62,8 +71,8 @@ There are a few common message structures:
        application/zip
     ```
 
-Now, if you don't care about any of that and just want to get the text of the first `text/plain` or
-`text/html` part you can find, that's easy.
+<a name="MessageBodyTLDR"></a>Now, if you don't care about any of that and just want to get the text of
+the first `text/plain` or `text/html` part you can find, that's easy.
 
 `MimeMessage` has two convenience properties for this: `TextBody` and `HtmlBody`.
 
@@ -71,7 +80,55 @@ Now, if you don't care about any of that and just want to get the text of the fi
 appropriate body part with a `Content-Type` of `text/html` that can be interpreted as the message body.
 Likewise, the `TextBody` property can be used to get the `text/plain` version of the message body.
 
-### How do I decrypt PGP messages that are embedded in the main message text?
+### <a name="AddressHeaders">How do I get the email addresses in the From, To, and Cc headers?</a>
+
+The `From`, `To`, and `Cc` properties of a `MimeMessage` are all of type `InternetAddressList`. An
+`InternetAddressList` is a list of `InternetAddress` items. This is where most people start to get
+lost because an `InternetAddress` is an abstract class that only really has a `Name` property.
+
+As you've probably already discovered, the `Name` property contains the name of the person
+(if available), but what you want is his or her email address, not their name.
+
+To get the email address, you'll need to figure out what subclass of address each `InternetAddress`
+really is. There are 2 subclasses of `InternetAddress`: `GroupAddress` and `MailboxAddress`.
+
+A `GroupAddress` is a named group of more `InternetAddress` items that are contained within the
+`Members` property. To get an idea of what a group address represents, consider the following
+examples:
+
+```
+To: My Friends: Joey <joey@friends.com>, Monica <monica@friends.com>, "Mrs. Chanandler Bong"
+    <chandler@friends.com>, Ross <ross@friends.com>, Rachel <rachel@friends.com>;
+```
+
+In the above example, the `To` header's `InternetAddressList` will contain only 1 item which will be a
+`GroupAddress` with a `Name` value of `My Friends`. The `Members` property of the `GroupAddress` will
+contain 5 more `InternetAddress` items (which will all be instances of `MailboxAddress`).
+
+The above example, however, is not very likely to ever be seen in messages you deal with. A far more
+common example would be the one below:
+
+```
+To: undisclosed-recipients:;
+```
+
+Most of the time, the `From`, `To`, and `Cc` headers will only contain mailbox addresses. As you will
+notice, a `MailboxAddress` has an `Address` property which will contain the email address of the
+mailbox. In the following example, the `Address` property will contain the value `john@smith.com`:
+
+```
+To: John Smith <john@smith.com>
+```
+
+If you only care about getting a flattened list of the mailbox addresses in a `From`, `To`, or `Cc`
+header, you can simply do something like this:
+
+```csharp
+foreach (var mailbox in message.To.Mailboxes)
+    Console.WriteLine ("{0}'s email address is {1}", mailbox.Name, mailbox.Address);
+```
+
+### <a name="DecryptInlinePGP">How do I decrypt PGP messages that are embedded in the main message text?</a>
 
 Some PGP-enabled mail clients, such as Thunderbird, embed encrypted PGP blurbs within the text/plain body
 of the message rather than using the PGP/MIME format that MimeKit prefers.
@@ -128,7 +185,8 @@ public Stream GetDecryptedStream (Stream encryptedData)
 The first variant is useful in cases where the encrypted PGP blurb is also digitally signed, allowing you to get
 your hands on the list of digitial signatures in order for you to verify each of them.
 
-To decrypt the content of the message, you'll want to locate the `TextPart` (in this case, it'll just be `message.Body`)
+To decrypt the content of the message, you'll want to locate the `TextPart` (in this case, it'll just be 
+`message.Body`)
 and then do this:
 
 ```
@@ -148,9 +206,9 @@ static Stream DecryptEmbeddedPgp (TextPart text)
 What you do with that decrypted stream is up to you. It's up to you to figure out what the decrypted content is
 (is it text? a jpeg image? a video?) and how to display it to the user.
 
-### How would I parse multipart/form-data from an HTTP web request?
+### <a name="ParseWebRequestFormData">How would I parse multipart/form-data from an HTTP web request?</a>
 
-Since classes like `HttpWebRequest` take care of parsing the HTTP headers (which includes the `Content-Type`
+Since classes like `HttpWebResponse` take care of parsing the HTTP headers (which includes the `Content-Type`
 header) and only offer a content stream to consume, MimeKit provides a way to deal with this using the following
 two static methods on `MimeEntity`:
 
@@ -172,7 +230,7 @@ MimeEntity ParseMultipartFormData (HttpWebResponse response)
 ```
 
 If the `multipart/form-data` HTTP response is expected to be large and you do not wish for the content to be
-read into memory, you do instead use the following approach:
+read into memory, you can use the following approach:
 
 ```csharp
 MimeEntity ParseMultipartFormData (HttpWebResponse response)
@@ -181,7 +239,8 @@ MimeEntity ParseMultipartFormData (HttpWebResponse response)
     var tmp = Path.GetTempFileName ();
 
     using (var stream = File.Open (tmp, FileMode.Open, FileAccess.ReadWrite)) {
-        // create a header for the multipart/form-data MIME entity based on the Content-Type value of the HTTP response
+        // create a header for the multipart/form-data MIME entity based on the Content-Type value of the HTTP
+        // response
         var header = Encoding.UTF8.GetBytes (string.Format ("Content-Type: {0}\r\n\r\n", response.ContentType));
 
         // write the header to the stream

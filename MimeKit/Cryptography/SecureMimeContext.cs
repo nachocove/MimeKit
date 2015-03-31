@@ -45,6 +45,7 @@ using Org.BouncyCastle.Asn1.Ntt;
 using Org.BouncyCastle.Asn1.Nist;
 
 using MimeKit.IO;
+using MimeKit.Utils;
 
 namespace MimeKit.Cryptography {
 	/// <summary>
@@ -57,6 +58,7 @@ namespace MimeKit.Cryptography {
 	/// </remarks>
 	public abstract class SecureMimeContext : CryptographyContext
 	{
+		internal const X509KeyUsageFlags DigitalSignatureKeyUsageFlags = X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.NonRepudiation;
 		static readonly int EncryptionAlgorithmCount = Enum.GetValues (typeof (EncryptionAlgorithm)).Length;
 		static readonly EncryptionAlgorithm[] DefaultEncryptionAlgorithmRank;
 		int enabled;
@@ -877,6 +879,15 @@ namespace MimeKit.Cryptography {
 			return false;
 		}
 
+		static DateTime ToAdjustedDateTime (DerUtcTime time)
+		{
+			try {
+				return time.ToAdjustedDateTime ();
+			} catch {
+				return DateUtils.Parse (time.AdjustedTimeString, "yyyyMMddHHmmsszzz");
+			}
+		}
+
 		DigitalSignatureCollection GetDigitalSignatures (CmsSignedDataParser parser)
 		{
 			var certificates = parser.GetCertificates ("Collection");
@@ -884,11 +895,7 @@ namespace MimeKit.Cryptography {
 			var crls = parser.GetCrls ("Collection");
 			var store = parser.GetSignerInfos ();
 
-			// FIXME: validate the certificates before importing them?
-			foreach (X509Certificate certificate in certificates.GetMatches (null))
-				Import (certificate);
-
-			// FIXME: validate the CRLs before importing them?
+			// FIXME: we might not want to import these...
 			foreach (X509Crl crl in crls.GetMatches (null))
 				Import (crl);
 
@@ -902,7 +909,7 @@ namespace MimeKit.Cryptography {
 					Asn1EncodableVector vector = signerInfo.SignedAttributes.GetAll (CmsAttributes.SigningTime);
 					foreach (Org.BouncyCastle.Asn1.Cms.Attribute attr in vector) {
 						var signingTime = (DerUtcTime) ((DerSet) attr.AttrValues)[0];
-						signature.CreationDate = signingTime.ToAdjustedDateTime ();
+						signature.CreationDate = ToAdjustedDateTime (signingTime);
 						signedDate = signature.CreationDate;
 						break;
 					}
@@ -927,6 +934,8 @@ namespace MimeKit.Cryptography {
 					signature.SignerCertificate = new SecureMimeDigitalCertificate (certificate);
 					if (algorithms.Count > 0 && signedDate != null)
 						UpdateSecureMimeCapabilities (certificate, signature.EncryptionAlgorithms, signedDate.Value);
+					else
+						Import (certificate);
 				}
 
 				var anchors = GetTrustedAnchors ();

@@ -353,7 +353,7 @@ namespace MimeKit.Cryptography {
 						continue;
 
 					var usage = certificate.Extensions[X509Extensions.KeyUsage.Id] as X509KeyUsageExtension;
-					if (usage != null && (usage.KeyUsages & RealX509KeyUsageFlags.DigitalSignature) == 0)
+					if (usage != null && (usage.KeyUsages & (RealX509KeyUsageFlags.DigitalSignature | RealX509KeyUsageFlags.NonRepudiation)) == 0)
 						continue;
 
 					if (!certificate.HasPrivateKey)
@@ -402,6 +402,7 @@ namespace MimeKit.Cryptography {
 		{
 			var signer = new RealCmsSigner (GetCmsSignerCertificate (mailbox));
 			signer.DigestAlgorithm = new Oid (GetDigestOid (digestAlgo));
+			signer.SignedAttributes.Add (new Pkcs9SigningTime ());
 			signer.IncludeOption = X509IncludeOption.ExcludeRoot;
 			return signer;
 		}

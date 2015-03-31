@@ -38,6 +38,7 @@ using MD5 = System.Security.Cryptography.MD5CryptoServiceProvider;
 
 using MimeKit.IO.Filters;
 using MimeKit.Encodings;
+using MimeKit.Utils;
 using MimeKit.IO;
 
 namespace MimeKit {
@@ -290,7 +291,6 @@ namespace MimeKit {
 					filename = ContentType.Name;
 
 				return filename != null ? filename.Trim () : null;
-
 			}
 			set {
 				if (value != null) {
@@ -348,6 +348,9 @@ namespace MimeKit {
 		/// <returns>The most efficient content encoding.</returns>
 		/// <param name="constraint">The encoding constraint.</param>
 		/// <param name="cancellationToken">A cancellation token.</param>
+		/// <exception cref="System.ArgumentOutOfRangeException">
+		/// <paramref name="constraint"/> is not a valid value.
+		/// </exception>
 		/// <exception cref="System.OperationCanceledException">
 		/// The operation was canceled via the cancellation token.
 		/// </exception>
@@ -355,6 +358,32 @@ namespace MimeKit {
 		/// An I/O error occurred.
 		/// </exception>
 		public ContentEncoding GetBestEncoding (EncodingConstraint constraint, CancellationToken cancellationToken = default (CancellationToken))
+		{
+			return GetBestEncoding (constraint, 78, cancellationToken);
+		}
+
+		/// <summary>
+		/// Calculates the most efficient content encoding given the specified constraint.
+		/// </summary>
+		/// <remarks>
+		/// If no <see cref="ContentObject"/> is set, <see cref="ContentEncoding.SevenBit"/> will be returned.
+		/// </remarks>
+		/// <returns>The most efficient content encoding.</returns>
+		/// <param name="constraint">The encoding constraint.</param>
+		/// <param name="maxLineLength">The maximum allowable length for a line (not counting the CRLF). Must be between <c>72</c> and <c>998</c> (inclusive).</param>
+		/// <param name="cancellationToken">A cancellation token.</param>
+		/// <exception cref="System.ArgumentOutOfRangeException">
+		/// <para><paramref name="maxLineLength"/> is not between <c>72</c> and <c>998</c> (inclusive).</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="constraint"/> is not a valid value.</para>
+		/// </exception>
+		/// <exception cref="System.OperationCanceledException">
+		/// The operation was canceled via the cancellation token.
+		/// </exception>
+		/// <exception cref="System.IO.IOException">
+		/// An I/O error occurred.
+		/// </exception>
+		public ContentEncoding GetBestEncoding (EncodingConstraint constraint, int maxLineLength, CancellationToken cancellationToken = default (CancellationToken))
 		{
 			if (ContentObject == null)
 				return ContentEncoding.SevenBit;
@@ -367,7 +396,7 @@ namespace MimeKit {
 					ContentObject.DecodeTo (filtered, cancellationToken);
 					filtered.Flush ();
 
-					return filter.GetBestEncoding (constraint);
+					return filter.GetBestEncoding (constraint, maxLineLength);
 				}
 			}
 		}
@@ -525,7 +554,6 @@ namespace MimeKit {
 		/// <param name="header">The header being added, changed or removed.</param>
 		protected override void OnHeadersChanged (HeaderListChangedAction action, Header header)
 		{
-			string text;
 			int value;
 
 			base.OnHeadersChanged (action, header);
@@ -535,18 +563,7 @@ namespace MimeKit {
 			case HeaderListChangedAction.Changed:
 				switch (header.Id) {
 				case HeaderId.ContentTransferEncoding:
-					text = header.Value.Trim ().ToLowerInvariant ();
-
-					switch (text) {
-					case "7bit":             encoding = ContentEncoding.SevenBit; break;
-					case "8bit":             encoding = ContentEncoding.EightBit; break;
-					case "binary":           encoding = ContentEncoding.Binary; break;
-					case "base64":           encoding = ContentEncoding.Base64; break;
-					case "quoted-printable": encoding = ContentEncoding.QuotedPrintable; break;
-					case "x-uuencode":       encoding = ContentEncoding.UUEncode; break;
-					case "uuencode":         encoding = ContentEncoding.UUEncode; break;
-					default:                 encoding = ContentEncoding.Default; break;
-					}
+					MimeUtils.TryParse (header.Value, out encoding);
 					break;
 				case HeaderId.ContentDuration:
 					if (int.TryParse (header.Value, out value))

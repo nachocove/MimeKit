@@ -1,5 +1,72 @@
 # Release Notes
 
+### MimeKit 1.0.12
+
+* Modified InternetAddressList.Equals() to return true if the lists contain the same
+  addresses even if they are in different orders. (issue #118)
+* Allow S/MIME certificates with the NonRepudiation key usage to be used for signing.
+  (issue #119)
+* Don't change the Content-Transfer-Encoding of MIME parts being encrypted as part of
+  a multipart/encrypted. (issue #122)
+* Fixed logic to decide if a PGP secret key is expired. (issue #120)
+* Added support for SecureMailboxAddresses to OpenPgpContext to allow key lookups by
+  fingerprints instead of email addresses.
+
+### MimeKit 1.0.11
+
+* Added the ContentDisposition.FormData string constant.
+* Allow the ContentDisposition.Disposition property to be set to values other than
+  "attachment" and "inline". (issue #112)
+* Shortened the length of the local-part of auto-generated Message-Ids.
+* Fixed MimeMessage.CreateFromMailMessage() to not duplicate From/To/Cc/etc addresses
+  if the System.Net.Mail.MailMessage has been sent via System.Net.Mail.SmtpClient
+  prior to calling MimeMessage.CreateFromMailMessage(). (issue #115)
+* When parsing S/MIME digital signatures, don't import the full certificate chain.
+  (issue #110)
+* Added immutability-friendly .ctor to MimeMessage for use with languages such as F#.
+  (issue #116)
+
+### MimeKit 1.0.10
+
+* Ignore semi-colons in Content-Transfer-Encoding headers to work around broken mailers.
+* Added ParserOptions.ParameterComplianceMode (defaults to RfcComoplianceMode.Loose)
+  which works around unquoted parameter values in Content-Type and Content-Disposition
+  headers. (issue #106)
+* Modified the MimeParser to handle whitespace between header field names and the ':'.
+* Probe to make sure that various System.Text.Encodings are available before adding
+  aliases for them (some may not be available depending on the platform).
+* Added a MimePart.GetBestEncoding() overload that takes a maxLineLength argument.
+* Modified MultipartSigned to use 78 characters as the max line length rather than 998
+  characters. (issue #107)
+
+### MimeKit 1.0.9
+
+* Added a new MessageDispositionNotification MimePart subclass to represent
+  message/disposition-notification parts.
+* Fixed the TNEF parser to gracefully deal with duplicate attachment properties.
+
+### MimeKit 1.0.8
+
+* Modified the parser to accept Message-Id values without a domain (i.e. "<local-part@>").
+* Fixed a NullReferenceException in MimeMessage.BodyParts in cases where a MessagePart
+  has a null Message.
+* Renamed DateUtils.TryParseDateTime() to DateUtils.TryParse() (the old API still exists
+  but has been marked [Obsolete]).
+* Renamed MimeUtils.TryParseVersion() to MimeUtils.TryParse() (the old API still exists
+  but has been marked [Obsolete]).
+* Fixed S/MIME support to gracefully deal with badly formatted signature timestamps
+  which incrorectly use leap seconds. (issue #103)
+
+### MimeKit 1.0.7
+
+* Fixed TnefPropertyReader.GetEmbeddedMessageReader() to skip the Guid.
+* When decrypting PGP data, iterate over all encrypted packets to find one that
+  can be decrypted (i.e. the private key exists in the user's keychain).
+* Updated WindowsSecureMimeContext to respect SecureMailboxAddresses like the
+  other backends. (issue #100)
+* Added a Pkcs9SigningTime attribute to the CmsSigner for WindowsSecureMimeContext.
+  (issue #101)
+
 ### MimeKit 1.0.6
 
 * Vastly improved MS-TNEF support. In addition to being fixed to properly extract

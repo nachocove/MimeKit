@@ -38,6 +38,7 @@ using MimeKit.Cryptography;
 #endif
 
 using MimeKit.Tnef;
+using MimeKit.Utils;
 
 namespace MimeKit {
 	/// <summary>
@@ -69,10 +70,25 @@ namespace MimeKit {
 		/// (the default) as it allows maximum interoperability with existing (broken) mail clients
 		/// and other mail software such as sloppily written perl scripts (aka spambots).</para>
 		/// <para>It should be noted that even in <see cref="RfcComplianceMode.Strict"/> mode, the address
-		/// parser is fairly liberal in what it accepts.</para>
+		/// parser is fairly liberal in what it accepts. Setting it to <see cref="RfcComplianceMode.Loose"/>
+		/// just makes it try harder to deal with garbage input.</para>
 		/// </remarks>
 		/// <value>The RFC compliance mode.</value>
 		public RfcComplianceMode AddressParserComplianceMode { get; set; }
+
+		/// <summary>
+		/// Gets or sets the compliance mode that should be used when parsing Content-Type and Content-Disposition parameters.
+		/// </summary>
+		/// <remarks>
+		/// <para>In general, you'll probably want this value to be <see cref="RfcComplianceMode.Loose"/>
+		/// (the default) as it allows maximum interoperability with existing (broken) mail clients
+		/// and other mail software such as sloppily written perl scripts (aka spambots).</para>
+		/// <para>It should be noted that even in <see cref="RfcComplianceMode.Strict"/> mode, the parameter
+		/// parser is fairly liberal in what it accepts. Setting it to <see cref="RfcComplianceMode.Loose"/>
+		/// just makes it try harder to deal with garbage input.</para>
+		/// </remarks>
+		/// <value>The RFC compliance mode.</value>
+		public RfcComplianceMode ParameterComplianceMode { get; set; }
 
 		/// <summary>
 		/// Gets or sets the compliance mode that should be used when decoding rfc2047 encoded words.
@@ -121,6 +137,7 @@ namespace MimeKit {
 		public ParserOptions ()
 		{
 			AddressParserComplianceMode = RfcComplianceMode.Loose;
+			ParameterComplianceMode = RfcComplianceMode.Loose;
 			Rfc2047ComplianceMode = RfcComplianceMode.Loose;
 			CharsetEncoding = Encoding.Default;
 			RespectContentLength = false;
@@ -138,6 +155,7 @@ namespace MimeKit {
 		{
 			var options = new ParserOptions ();
 			options.AddressParserComplianceMode = AddressParserComplianceMode;
+			options.ParameterComplianceMode = ParameterComplianceMode;
 			options.Rfc2047ComplianceMode = Rfc2047ComplianceMode;
 			options.RespectContentLength = RespectContentLength;
 			options.CharsetEncoding = CharsetEncoding;
@@ -225,7 +243,30 @@ namespace MimeKit {
 			mimeTypes[mimeType] = ctor;
 		}
 
-		internal MimeEntity CreateEntity (ContentType contentType, IEnumerable<Header> headers, bool toplevel)
+		static bool IsEncoded (IList<Header> headers)
+		{
+			ContentEncoding encoding;
+
+			for (int i = 0; i < headers.Count; i++) {
+				if (headers[i].Id != HeaderId.ContentTransferEncoding)
+					continue;
+
+				MimeUtils.TryParse (headers[i].Value, out encoding);
+
+				switch (encoding) {
+				case ContentEncoding.SevenBit:
+				case ContentEncoding.EightBit:
+				case ContentEncoding.Binary:
+					return false;
+				default:
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		internal MimeEntity CreateEntity (ContentType contentType, IList<Header> headers, bool toplevel)
 		{
 			var entity = new MimeEntityConstructorInfo (this, contentType, headers, toplevel);
 			var subtype = contentType.MediaSubtype.ToLowerInvariant ();
@@ -239,11 +280,31 @@ namespace MimeKit {
 					return (MimeEntity) ctor.Invoke (new object[] { entity });
 			}
 
+			// Note: message/rfc822 and message/partial are not allowed to be encoded according to rfc2046
+			// (sections 5.2.1 and 5.2.2, respectively). Since some broken clients will encode them anyway,
+			// it is necessary for us to treat those as opaque blobs instead, and thus the parser should
+			// parse them as normal MimeParts instead of MessageParts.
+			//
+			// Technically message/disposition-notification is only allowed to have use the 7bit encoding
+			// as well, but since MessageDispositionNotification is a MImePart subclass rather than a
+			// MessagePart subclass, it means that the content won't be parsed until later and so we can
+			// actually handle that w/o any problems.
 			if (type == "message") {
-				if (subtype == "partial")
-					return new MessagePartial (entity);
-
-				return new MessagePart (entity);
+				switch (subtype) {
+				case "disposition-notification":
+					return new MessageDispositionNotification (entity);
+				case "partial":
+					if (!IsEncoded (headers))
+						return new MessagePartial (entity);
+					break;
+				case "external-body":
+				case "rfc2822":
+				case "rfc822":
+				case "news":
+					if (!IsEncoded (headers))
+						return new MessagePart (entity);
+					break;
+				}
 			}
 
 			if (type == "multipart") {
