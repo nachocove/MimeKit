@@ -52,9 +52,14 @@ namespace MimeKit.Tnef {
 		/// <summary>
 		/// Initializes a new instance of the <see cref="MimeKit.Tnef.TnefPart"/> class.
 		/// </summary>
-		/// <remarks>This constructor is used by <see cref="MimeKit.MimeParser"/>.</remarks>
-		/// <param name="entity">Information used by the constructor.</param>
-		public TnefPart (MimeEntityConstructorInfo entity) : base (entity)
+		/// <remarks>
+		/// This constructor is used by <see cref="MimeKit.MimeParser"/>.
+		/// </remarks>
+		/// <param name="args">Information used by the constructor.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="args"/> is <c>null</c>.
+		/// </exception>
+		public TnefPart (MimeEntityConstructorArgs args) : base (args)
 		{
 		}
 
@@ -190,6 +195,8 @@ namespace MimeKit.Tnef {
 			var prop = reader.TnefPropertyReader;
 			MimePart attachment = null;
 			int outIndex, outLength;
+			TnefAttachFlags flags;
+			string[] mimeType;
 			byte[] attachData;
 			string text;
 
@@ -257,14 +264,14 @@ namespace MimeKit.Tnef {
 							stream.Read (guid, 0, 16);
 
 							// the rest is content
-							stream.CopyTo (content, 4096);
+							using (var filtered = new FilteredStream (content)) {
+								filtered.Add (filter);
+								stream.CopyTo (filtered, 4096);
+								filtered.Flush ();
+							}
 
-#if !PORTABLE
-							var buffer = content.GetBuffer ();
-#else
-							var buffer = content.ToArray ();
-#endif
-							filter.Flush (buffer, 0, (int) content.Length, out outIndex, out outLength);
+							content.Position = 0;
+
 							attachment.ContentTransferEncoding = filter.GetBestEncoding (EncodingConstraint.SevenBit);
 							attachment.ContentObject = new ContentObject (content);
 							filter.Reset ();
@@ -273,6 +280,22 @@ namespace MimeKit.Tnef {
 							break;
 						case TnefPropertyId.AttachMethod:
 							attachMethod = (TnefAttachMethod) prop.ReadValueAsInt32 ();
+							break;
+						case TnefPropertyId.AttachMimeTag:
+							mimeType = prop.ReadValueAsString ().Split ('/');
+							if (mimeType.Length == 2) {
+								attachment.ContentType.MediaType = mimeType[0].Trim ();
+								attachment.ContentType.MediaSubtype = mimeType[1].Trim ();
+							}
+							break;
+						case TnefPropertyId.AttachFlags:
+							flags = (TnefAttachFlags) prop.ReadValueAsInt32 ();
+							if ((flags & TnefAttachFlags.RenderedInBody) != 0) {
+								if (attachment.ContentDisposition == null)
+									attachment.ContentDisposition = new ContentDisposition (ContentDisposition.Inline);
+								else
+									attachment.ContentDisposition.Disposition = ContentDisposition.Inline;
+							}
 							break;
 						case TnefPropertyId.AttachSize:
 							if (attachment.ContentDisposition == null)

@@ -208,6 +208,8 @@ namespace UnitTests {
 			var prop = reader.TnefPropertyReader;
 			MimePart attachment = null;
 			int outIndex, outLength;
+			TnefAttachFlags flags;
+			string[] mimeType;
 			byte[] attachData;
 			DateTime time;
 			string text;
@@ -272,6 +274,25 @@ namespace UnitTests {
 						case TnefPropertyId.AttachMethod:
 							attachMethod = (TnefAttachMethod) prop.ReadValueAsInt32 ();
 							Console.WriteLine ("Attachment Property: {0} = {1}", prop.PropertyTag.Id, attachMethod);
+							break;
+						case TnefPropertyId.AttachMimeTag:
+							text = prop.ReadValueAsString ();
+							mimeType = text.Split ('/');
+							if (mimeType.Length == 2) {
+								attachment.ContentType.MediaType = mimeType[0].Trim ();
+								attachment.ContentType.MediaSubtype = mimeType[1].Trim ();
+							}
+							Console.WriteLine ("Attachment Property: {0} = {1}", prop.PropertyTag.Id, text);
+							break;
+						case TnefPropertyId.AttachFlags:
+							flags = (TnefAttachFlags) prop.ReadValueAsInt32 ();
+							if ((flags & TnefAttachFlags.RenderedInBody) != 0) {
+								if (attachment.ContentDisposition == null)
+									attachment.ContentDisposition = new ContentDisposition (ContentDisposition.Inline);
+								else
+									attachment.ContentDisposition.Disposition = ContentDisposition.Inline;
+							}
+							Console.WriteLine ("Attachment Property: {0} = {1}", prop.PropertyTag.Id, flags);
 							break;
 						case TnefPropertyId.AttachData:
 							var stream = prop.GetRawValueReadStream ();

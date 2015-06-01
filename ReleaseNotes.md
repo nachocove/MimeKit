@@ -1,5 +1,71 @@
 # Release Notes
 
+### MimeKit 1.2.3
+
+* Fixed TextToFlowed logic that stripped trailing spaces.
+* Switched to PCL Profile78 to support Xamarin.Forms.
+
+### MimeKit 1.2.2
+
+* Added a MultipartAlternative class which adds some useful convenience methods
+  and properties for use with the multipart/alternative mime-type.
+* Fixed MimeKitLite's MimeParser to use TnefPart for the ms-tnef mime-types.
+* Fixed MimeMessage.TextBody to convert format=flowed into plain text.
+* Made BoundStream.LeaveOpen protected instead of private.
+* Fixed ChainedStream to dispose child streams when it is disposed.
+* Obsoleted MultipartEncrypted.Create() methods in favor of equivalent
+  Encrypt() and SignAndEncrypt() methods to make them a bit more intuitive.
+* Added a MimeVisitor class that implements the visitor pattern for visiting
+  MIME nodes.
+
+### MimeKit 1.2.1
+
+* Added a Format property to ContentType.
+* Added a TryGetValue() method to ParameterList.
+* Added IsFlowed and IsRichText convenience properties to TextPart.
+* Fixed the HtmlToHtml converter to properly handle HTML text that begins
+  with leading text data.
+* Fixed MimeParser.ParseHeaders() to handle input that does not end with a
+  blank line. (issue #142)
+* Renamed MimeEntityConstructorInfo to MimeEntityConstructorArgs.
+* Modified the MimeParser to use TextPart to represent application/rtf.
+
+### MimeKit 1.2.0
+
+* Force the use of the rfc2047 "B" encoding for ISO-2022-JP. (issue #139)
+* Added some text converters to convert between various text formats
+  including format=flowed and HTML.
+
+### MimeKit 1.0.15
+
+* Fixed MimeMessage.WriteTo() to be thread-safe. (issue #138)
+
+### MimeKit 1.0.14
+
+* Added support for .NET 3.5.
+* Added a convenience CmsSigner .ctor that takes an X509Certificate2 argument.
+* Fixed BodyBuilder to never return a TextPart w/ a null ContentObject.
+* Fixed TextPart.GetText() to protect against NullReferenceExceptions if the
+  ContentObject is null.
+* Fixed MimeFilterBase.EnsureOutputSize() to initialize OutputBuffer if it is
+  null. Prevents NullReferenceExceptions in obscure corner cases. (issue #135)
+* Added a TnefAttachFlags enum which is used to determine if image attachments
+  in MS-TNEF data are meant to have a Content-Disposition of "inline" when
+  extracted as MIME attachments. (issue #129)
+* Fixed TnefPart.ConvertToMessage() and ExtractAttachments() to use the
+  PR_ATTACH_MIME_TAG property to determine the intended mime-type for extracted
+  attachments.
+* Catch DecoderFallbackExceptions in MimeMessage.ToString() and fall back to
+  Latin1. (issue #137)
+
+### MimeKit 1.0.13
+
+* Added a work-around for a bug in Thunderbird's multipart/related implementation.
+  (issue #124)
+* Improved MimeMessage.CreateFromMailMessage() a bit more to avoid creating empty
+  From, Reply-To, To, Cc and/or Bcc headers.
+* Modified the HeaderIdExtensions to only be available for the HeaderId enum values.
+
 ### MimeKit 1.0.12
 
 * Modified InternetAddressList.Equals() to return true if the lists contain the same

@@ -51,7 +51,7 @@ namespace MimeKit {
 	public class ParserOptions
 	{
 		readonly Dictionary<string, ConstructorInfo> mimeTypes = new Dictionary<string, ConstructorInfo> ();
-		static readonly Type[] ConstructorArgTypes = { typeof (MimeEntityConstructorInfo) };
+		static readonly Type[] ConstructorArgTypes = { typeof (MimeEntityConstructorArgs) };
 
 		/// <summary>
 		/// The default parser options.
@@ -208,7 +208,7 @@ namespace MimeKit {
 		/// <see cref="MimePart"/>, or <see cref="MessagePart"/>.</para>
 		/// <para>-or-</para>
 		/// <para><paramref name="type"/> does not have a constructor that takes
-		/// only a <see cref="MimeEntityConstructorInfo"/> argument.</para>
+		/// only a <see cref="MimeEntityConstructorArgs"/> argument.</para>
 		/// </exception>
 		public void RegisterMimeType (string mimeType, Type type)
 		{
@@ -238,7 +238,7 @@ namespace MimeKit {
 #endif
 
 			if (ctor == null)
-				throw new ArgumentException ("The specified type must have a constructor that takes a MimeEntityConstructorInfo argument.", "type");
+				throw new ArgumentException ("The specified type must have a constructor that takes a MimeEntityConstructorArgs argument.", "type");
 
 			mimeTypes[mimeType] = ctor;
 		}
@@ -268,7 +268,7 @@ namespace MimeKit {
 
 		internal MimeEntity CreateEntity (ContentType contentType, IList<Header> headers, bool toplevel)
 		{
-			var entity = new MimeEntityConstructorInfo (this, contentType, headers, toplevel);
+			var args = new MimeEntityConstructorArgs (this, contentType, headers, toplevel);
 			var subtype = contentType.MediaSubtype.ToLowerInvariant ();
 			var type = contentType.MediaType.ToLowerInvariant ();
 
@@ -277,7 +277,7 @@ namespace MimeKit {
 				ConstructorInfo ctor;
 
 				if (mimeTypes.TryGetValue (mimeType, out ctor))
-					return (MimeEntity) ctor.Invoke (new object[] { entity });
+					return (MimeEntity) ctor.Invoke (new object[] { args });
 			}
 
 			// Note: message/rfc822 and message/partial are not allowed to be encoded according to rfc2046
@@ -292,62 +292,66 @@ namespace MimeKit {
 			if (type == "message") {
 				switch (subtype) {
 				case "disposition-notification":
-					return new MessageDispositionNotification (entity);
+					return new MessageDispositionNotification (args);
 				case "partial":
 					if (!IsEncoded (headers))
-						return new MessagePartial (entity);
+						return new MessagePartial (args);
 					break;
 				case "external-body":
 				case "rfc2822":
 				case "rfc822":
 				case "news":
 					if (!IsEncoded (headers))
-						return new MessagePart (entity);
+						return new MessagePart (args);
 					break;
 				}
 			}
 
 			if (type == "multipart") {
-				if (subtype == "related")
-					return new MultipartRelated (entity);
-
-#if ENABLE_CRYPTO
-				if (subtype == "encrypted")
-					return new MultipartEncrypted (entity);
-
-				if (subtype == "signed")
-					return new MultipartSigned (entity);
-#endif
-
-				return new Multipart (entity);
-			}
-
-#if ENABLE_CRYPTO
-			if (type == "application") {
 				switch (subtype) {
-				case "x-pkcs7-signature":
-				case "pkcs7-signature":
-					return new ApplicationPkcs7Signature (entity);
-				case "x-pgp-encrypted":
-				case "pgp-encrypted":
-					return new ApplicationPgpEncrypted (entity);
-				case "x-pgp-signature":
-				case "pgp-signature":
-					return new ApplicationPgpSignature (entity);
-				case "x-pkcs7-mime":
-				case "pkcs7-mime":
-					return new ApplicationPkcs7Mime (entity);
-				case "vnd.ms-tnef":
-				case "ms-tnef":
-					return new TnefPart (entity);
+				case "alternative":
+					return new MultipartAlternative (args);
+				case "related":
+					return new MultipartRelated (args);
+#if ENABLE_CRYPTO
+				case "encrypted":
+					return new MultipartEncrypted (args);
+				case "signed":
+					return new MultipartSigned (args);
+#endif
+				default:
+					return new Multipart (args);
 				}
 			}
+
+			if (type == "application") {
+				switch (subtype) {
+#if ENABLE_CRYPTO
+				case "x-pkcs7-signature":
+				case "pkcs7-signature":
+					return new ApplicationPkcs7Signature (args);
+				case "x-pgp-encrypted":
+				case "pgp-encrypted":
+					return new ApplicationPgpEncrypted (args);
+				case "x-pgp-signature":
+				case "pgp-signature":
+					return new ApplicationPgpSignature (args);
+				case "x-pkcs7-mime":
+				case "pkcs7-mime":
+					return new ApplicationPkcs7Mime (args);
 #endif
+				case "vnd.ms-tnef":
+				case "ms-tnef":
+					return new TnefPart (args);
+				case "rtf":
+					return new TextPart (args);
+				}
+			}
 
 			if (type == "text")
-				return new TextPart (entity);
+				return new TextPart (args);
 
-			return new MimePart (entity);
+			return new MimePart (args);
 		}
 	}
 }

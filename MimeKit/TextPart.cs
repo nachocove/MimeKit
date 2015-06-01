@@ -42,8 +42,7 @@ using Encoder = Portable.Text.Encoder;
 using Decoder = Portable.Text.Decoder;
 #endif
 
-using MimeKit.IO;
-using MimeKit.IO.Filters;
+using MimeKit.Text;
 using MimeKit.Utils;
 
 namespace MimeKit {
@@ -61,9 +60,14 @@ namespace MimeKit {
 		/// <summary>
 		/// Initializes a new instance of the <see cref="MimeKit.TextPart"/> class.
 		/// </summary>
-		/// <remarks>This constructor is used by <see cref="MimeKit.MimeParser"/>.</remarks>
-		/// <param name="entity">Information used by the constructor.</param>
-		public TextPart (MimeEntityConstructorInfo entity) : base (entity)
+		/// <remarks>
+		/// This constructor is used by <see cref="MimeKit.MimeParser"/>.
+		/// </remarks>
+		/// <param name="args">Information used by the constructor.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="args"/> is <c>null</c>.
+		/// </exception>
+		public TextPart (MimeEntityConstructorArgs args) : base (args)
 		{
 		}
 
@@ -155,10 +159,52 @@ namespace MimeKit {
 		}
 
 		/// <summary>
+		/// Gets whether or not this text part contains enriched text.
+		/// </summary>
+		/// <remarks>
+		/// Checks whether or not the text part's Content-Type is <c>text/enriched</c> or its
+		/// predecessor, <c>text/richtext</c> (not to be confused with <c>text/rtf</c>).
+		/// </remarks>
+		/// <value><c>true</c> if the text is enriched; otherwise, <c>false</c>.</value>
+		bool IsEnriched {
+			get { return ContentType.Matches ("text", "enriched") || ContentType.Matches ("text", "richtext"); }
+		}
+
+		/// <summary>
+		/// Gets whether or not this text part contains flowed text.
+		/// </summary>
+		/// <remarks>
+		/// Checks whether or not the text part's Content-Type is <c>text/plain</c> and
+		/// has a format parameter with a value of <c>flowed</c>.
+		/// </remarks>
+		/// <value><c>true</c> if the text is flowed; otherwise, <c>false</c>.</value>
+		public bool IsFlowed {
+			get {
+				string format;
+
+				if (!IsPlain || !ContentType.Parameters.TryGetValue ("format", out format))
+					return false;
+
+				return format.ToLowerInvariant () == "flowed";
+			}
+		}
+
+		/// <summary>
+		/// Gets whether or not this text part contains HTML.
+		/// </summary>
+		/// <remarks>
+		/// Checks whether or not the text part's Content-Type is <c>text/html</c>.
+		/// </remarks>
+		/// <value><c>true</c> if the text is html; otherwise, <c>false</c>.</value>
+		public bool IsHtml {
+			get { return ContentType.Matches ("text", "html"); }
+		}
+
+		/// <summary>
 		/// Gets whether or not this text part contains plain text.
 		/// </summary>
 		/// <remarks>
-		/// Checks whether or not the text part's Content-Type is text/plain.
+		/// Checks whether or not the text part's Content-Type is <c>text/plain</c>.
 		/// </remarks>
 		/// <value><c>true</c> if the text is html; otherwise, <c>false</c>.</value>
 		public bool IsPlain {
@@ -166,14 +212,14 @@ namespace MimeKit {
 		}
 
 		/// <summary>
-		/// Gets whether or not this text part contains HTML.
+		/// Gets whether or not this text part contains RTF.
 		/// </summary>
 		/// <remarks>
-		/// Checks whether or not the text part's Content-Type is text/html.
+		/// Checks whether or not the text part's Content-Type is <c>text/rtf</c>.
 		/// </remarks>
-		/// <value><c>true</c> if the text is html; otherwise, <c>false</c>.</value>
-		public bool IsHtml {
-			get { return ContentType.Matches ("text", "html"); }
+		/// <value><c>true</c> if the text is RTF; otherwise, <c>false</c>.</value>
+		public bool IsRichText {
+			get { return ContentType.Matches ("text", "rtf") || ContentType.Matches ("application", "rtf"); }
 		}
 
 		/// <summary>
@@ -190,6 +236,9 @@ namespace MimeKit {
 		/// <value>The text.</value>
 		public string Text {
 			get {
+				if (ContentObject == null)
+					return string.Empty;
+
 				var charset = ContentType.Parameters["charset"];
 
 				using (var memory = new MemoryStream ()) {
@@ -214,7 +263,7 @@ namespace MimeKit {
 							return CharsetUtils.UTF8.GetString (content, 0, (int) memory.Length);
 						} catch (DecoderFallbackException) {
 							// fall back to iso-8859-1
-							encoding = Encoding.GetEncoding (28591); // iso-8859-1
+							encoding = CharsetUtils.Latin1;
 						}
 					}
 
@@ -223,6 +272,49 @@ namespace MimeKit {
 			}
 			set {
 				SetText (Encoding.UTF8, value);
+			}
+		}
+
+		/// <summary>
+		/// Dispatches to the specific visit method for this MIME entity.
+		/// </summary>
+		/// <remarks>
+		/// This default implementation for <see cref="MimeKit.MimeEntity"/> nodes
+		/// calls <see cref="MimeKit.MimeVisitor.VisitMimeEntity"/>. Override this
+		/// method to call into a more specific method on a derived visitor class
+		/// of the <see cref="MimeKit.MimeVisitor"/> class. However, it should still
+		/// support unknown visitors by calling
+		/// <see cref="MimeKit.MimeVisitor.VisitMimeEntity"/>.
+		/// </remarks>
+		/// <param name="visitor">The visitor.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="visitor"/> is <c>null</c>.
+		/// </exception>
+		public override void Accept (MimeVisitor visitor)
+		{
+			if (visitor == null)
+				throw new ArgumentNullException ("visitor");
+
+			visitor.VisitTextPart (this);
+		}
+
+		/// <summary>
+		/// Determines whether or not the text is in the specified format.
+		/// </summary>
+		/// <remarks>
+		/// Determines whether or not the text is in the specified format.
+		/// </remarks>
+		/// <returns><c>true</c> if the text is in the specified format; otherwise, <c>false</c>.</returns>
+		/// <param name="format">The text format.</param>
+		internal bool IsFormat (TextFormat format)
+		{
+			switch (format) {
+			case TextFormat.Text:     return IsPlain;
+			case TextFormat.Flowed:   return IsFlowed;
+			case TextFormat.Html:     return IsHtml;
+			case TextFormat.Enriched: return IsEnriched;
+			case TextFormat.RichText: return IsRichText;
+			default: return false;
 			}
 		}
 
@@ -244,6 +336,9 @@ namespace MimeKit {
 		{
 			if (encoding == null)
 				throw new ArgumentNullException ("encoding");
+
+			if (ContentObject == null)
+				return string.Empty;
 
 			using (var memory = new MemoryStream ()) {
 				ContentObject.DecodeTo (memory);
@@ -287,8 +382,8 @@ namespace MimeKit {
 		/// Sets the text content and the charset parameter in the Content-Type header.
 		/// </summary>
 		/// <remarks>
-		/// This method is similar to setting the <see cref="Text"/> property, but allows
-		/// specifying a charset encoding to use. Also updates the
+		/// This method is similar to setting the <see cref="TextPart.Text"/> property,
+		/// but allows specifying a charset encoding to use. Also updates the
 		/// <see cref="ContentType.Charset"/> property.
 		/// </remarks>
 		/// <param name="encoding">The charset encoding.</param>
@@ -315,8 +410,8 @@ namespace MimeKit {
 		/// Sets the text content and the charset parameter in the Content-Type header.
 		/// </summary>
 		/// <remarks>
-		/// This method is similar to setting the <see cref="Text"/> property, but allows
-		/// specifying a charset encoding to use. Also updates the
+		/// This method is similar to setting the <see cref="TextPart.Text"/> property,
+		/// but allows specifying a charset encoding to use. Also updates the
 		/// <see cref="ContentType.Charset"/> property.
 		/// </remarks>
 		/// <param name="charset">The charset encoding.</param>

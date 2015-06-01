@@ -24,6 +24,8 @@
 // THE SOFTWARE.
 //
 
+using System;
+
 using MimeKit.IO;
 
 namespace MimeKit {
@@ -41,9 +43,14 @@ namespace MimeKit {
 		/// <summary>
 		/// Initializes a new instance of the <see cref="MimeKit.MessageDispositionNotification"/> class.
 		/// </summary>
-		/// <remarks>This constructor is used by <see cref="MimeKit.MimeParser"/>.</remarks>
-		/// <param name="entity">Information used by the constructor.</param>
-		public MessageDispositionNotification (MimeEntityConstructorInfo entity) : base (entity)
+		/// <remarks>
+		/// This constructor is used by <see cref="MimeKit.MimeParser"/>.
+		/// </remarks>
+		/// <param name="args">Information used by the constructor.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="args"/> is <c>null</c>.
+		/// </exception>
+		public MessageDispositionNotification (MimeEntityConstructorArgs args) : base (args)
 		{
 		}
 
@@ -93,6 +100,29 @@ namespace MimeKit {
 			stream.Position = 0;
 
 			ContentObject = new ContentObject (stream);
+		}
+
+		/// <summary>
+		/// Dispatches to the specific visit method for this MIME entity.
+		/// </summary>
+		/// <remarks>
+		/// This default implementation for <see cref="MimeKit.MimeEntity"/> nodes
+		/// calls <see cref="MimeKit.MimeVisitor.VisitMimeEntity"/>. Override this
+		/// method to call into a more specific method on a derived visitor class
+		/// of the <see cref="MimeKit.MimeVisitor"/> class. However, it should still
+		/// support unknown visitors by calling
+		/// <see cref="MimeKit.MimeVisitor.VisitMimeEntity"/>.
+		/// </remarks>
+		/// <param name="visitor">The visitor.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="visitor"/> is <c>null</c>.
+		/// </exception>
+		public override void Accept (MimeVisitor visitor)
+		{
+			if (visitor == null)
+				throw new ArgumentNullException ("visitor");
+
+			visitor.VisitMessageDispositionNotification (this);
 		}
 	}
 }

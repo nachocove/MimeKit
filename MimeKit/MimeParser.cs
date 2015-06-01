@@ -764,7 +764,7 @@ namespace MimeKit {
 
 				if (!Header.TryParse (options, buf, headerIndex, false, out header)) {
 #if DEBUG
-					Debug.WriteLine ("Invalid header at offset {0}: {1}", headerOffset, ConvertToCString (headerBuffer, 0, headerIndex));
+					Debug.WriteLine (string.Format ("Invalid header at offset {0}: {1}", headerOffset, ConvertToCString (headerBuffer, 0, headerIndex)));
 #endif
 					headerIndex = 0;
 					return;
@@ -832,7 +832,7 @@ namespace MimeKit {
 			do {
 				if (ReadAhead (Math.Max (ReadAheadSize, left), 0) <= left) {
 					// EOF reached before we reached the end of the headers...
-					if (left == 0 && !midline && headers.Count > 0) {
+					if (left == 0 && !midline) {
 						// the last header we encountered has been parsed cleanly, so try to
 						// fail gracefully by pretending we found the end of the headers...
 						//
@@ -883,11 +883,6 @@ namespace MimeKit {
 								// the ':', but field names themselves are not allowed
 								// to contain spaces.
 								if (IsBlank (*inptr)) {
-									if (!blank) {
-										valid = false;
-										break;
-									}
-
 									blank = true;
 								} else if (blank || IsControl (*inptr)) {
 									valid = false;
@@ -923,7 +918,7 @@ namespace MimeKit {
 
 							if (state == MimeParserState.MessageHeaders && headers.Count == 0) {
 								// ignore From-lines that might appear at the start of a message
-								if (length != 4 || !IsMboxMarker (start)) {
+								if (length < 5 || !IsMboxMarker (start)) {
 									inputIndex = (int) (start - inbuf);
 									state = MimeParserState.Error;
 									headerIndex = 0;
@@ -1402,7 +1397,9 @@ namespace MimeKit {
 			var boundary = multipart.Boundary;
 
 			if (boundary == null) {
+#if DEBUG
 				Debug.WriteLine ("Multipart without a boundary encountered!");
+#endif
 
 				// Note: this will scan all content into the preamble...
 				return MultipartScanPreamble (multipart, inbuf);
@@ -1439,7 +1436,7 @@ namespace MimeKit {
 			state = MimeParserState.Headers;
 			while (state < MimeParserState.Content) {
 				if (Step (inbuf) == MimeParserState.Error)
-					throw new FormatException ("Failed to parse entity headers.");
+					throw new FormatException ("Failed to parse headers.");
 			}
 
 			state = MimeParserState.Complete;

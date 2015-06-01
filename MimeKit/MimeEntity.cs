@@ -58,26 +58,29 @@ namespace MimeKit {
 
 		/// <summary>
 		/// Initializes a new instance of the <see cref="MimeKit.MimeEntity"/> class
-		/// based on the <see cref="MimeEntityConstructorInfo"/>.
+		/// based on the <see cref="MimeEntityConstructorArgs"/>.
 		/// </summary>
 		/// <remarks>
 		/// Custom <see cref="MimeEntity"/> subclasses MUST implement this constructor
 		/// in order to register it using <see cref="ParserOptions.RegisterMimeType"/>.
 		/// </remarks>
-		/// <param name="entity">Information used by the constructor.</param>
-		protected MimeEntity (MimeEntityConstructorInfo entity)
+		/// <param name="args">Information used by the constructor.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="args"/> is <c>null</c>.
+		/// </exception>
+		protected MimeEntity (MimeEntityConstructorArgs args)
 		{
-			if (entity == null)
-				throw new ArgumentNullException ("entity");
+			if (args == null)
+				throw new ArgumentNullException ("args");
 
-			Headers = new HeaderList (entity.ParserOptions);
-			ContentType = entity.ContentType;
+			Headers = new HeaderList (args.ParserOptions);
+			ContentType = args.ContentType;
 
 			ContentType.Changed += ContentTypeChanged;
 			Headers.Changed += HeadersChanged;
 
-			foreach (var header in entity.Headers) {
-				if (entity.IsTopLevel && !header.Field.StartsWith ("Content-", StringComparison.OrdinalIgnoreCase))
+			foreach (var header in args.Headers) {
+				if (args.IsTopLevel && !header.Field.StartsWith ("Content-", StringComparison.OrdinalIgnoreCase))
 					continue;
 
 				Headers.Add (header);
@@ -325,6 +328,29 @@ namespace MimeKit {
 		}
 
 		/// <summary>
+		/// Dispatches to the specific visit method for this MIME entity.
+		/// </summary>
+		/// <remarks>
+		/// This default implementation for <see cref="MimeKit.MimeEntity"/> nodes
+		/// calls <see cref="MimeKit.MimeVisitor.VisitMimeEntity"/>. Override this
+		/// method to call into a more specific method on a derived visitor class
+		/// of the <see cref="MimeKit.MimeVisitor"/> class. However, it should still
+		/// support unknown visitors by calling
+		/// <see cref="MimeKit.MimeVisitor.VisitMimeEntity"/>.
+		/// </remarks>
+		/// <param name="visitor">The visitor.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="visitor"/> is <c>null</c>.
+		/// </exception>
+		public virtual void Accept (MimeVisitor visitor)
+		{
+			if (visitor == null)
+				throw new ArgumentNullException ("visitor");
+
+			visitor.VisitMimeEntity (this);
+		}
+
+		/// <summary>
 		/// Writes the <see cref="MimeKit.MimeEntity"/> to the specified output stream.
 		/// </summary>
 		/// <remarks>
@@ -353,10 +379,7 @@ namespace MimeKit {
 			if (stream == null)
 				throw new ArgumentNullException ("stream");
 
-			if (options.WriteHeaders)
-				Headers.WriteTo (options, stream, cancellationToken);
-			else
-				options.WriteHeaders = true;
+			Headers.WriteTo (options, stream, cancellationToken);
 
 			var cancellable = stream as ICancellableStream;
 
@@ -921,7 +944,7 @@ namespace MimeKit {
 			if (content == null)
 				throw new ArgumentNullException ("content");
 
-			var format = FormatOptions.Default.Clone ();
+			var format = FormatOptions.CloneDefault ();
 			format.NewLineFormat = NewLineFormat.Dos;
 
 			var encoded = contentType.Encode (format, Encoding.UTF8);

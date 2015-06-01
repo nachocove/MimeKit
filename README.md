@@ -11,7 +11,7 @@ MimeKit is a C# library which may be used for the creation and parsing of messag
 
 ## History
 
-As a developer and user of Electronic Mail clients, I had come to realize that the vast majority of email client
+As a developer and user of email clients, I had come to realize that the vast majority of email client
 (and server) software had less-than-satisfactory MIME implementations. More often than not these email clients
 created broken MIME messages and/or would incorrectly try to parse a MIME message thus subtracting from the full
 benefits that MIME was meant to provide. MimeKit is meant to address this issue by following the MIME specification
@@ -229,7 +229,7 @@ while (iter.MoveNext ()) {
     var multipart = iter.Parent as Multipart;
     var part = iter.Current as MimePart;
 
-    if (parent != null && part != null && part.IsAttachment) {
+    if (multipart != null && part != null && part.IsAttachment) {
         // keep track of each attachment's parent multipart
         multiparts.Add (multipart);
         attachments.Add (part);
@@ -592,7 +592,7 @@ using (var ctx = new MyGnuPGContext ()) {
     // Note: this assumes that "Alice" has a public PGP key that matches her email
     // address. If she doesn't, try using a SecureMailboxAddress which allows you
     // to specify the fingerprint of her public PGP key to use for lookups.
-    message.Body = MultipartEncrypted.Create (ctx, message.To.Mailboxes, body);
+    message.Body = MultipartEncrypted.Encrypt (ctx, message.To.Mailboxes, body);
 }
 ```
 
@@ -761,6 +761,18 @@ simply send me a Pull Request and I will try to review your changes in a timely 
 
 If you'd like to contribute but don't have any particular features in mind to work on, check out the issue
 tracker and look for something that might pique your interest!
+
+## Donate
+
+MimeKit is a personal open source project that I have put thousands of hours into perfecting with the
+goal of making it not only the very best MIME parser framework for .NET, but the best MIME parser
+framework for any programming language. I need your help to achieve this.
+
+<a href="http://www.pledgie.com/campaigns/29300" target="_blank">
+  <img src="http://www.pledgie.com/campaigns/29300.png?skin_name=chrome"
+       alt="Click here to lend your support to MimeKit and MailKit by making a donation via pledgie.com!"
+       border="0" />
+</a>
 
 ## Reporting Bugs
 

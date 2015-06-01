@@ -72,9 +72,14 @@ namespace MimeKit {
 		/// <summary>
 		/// Initializes a new instance of the <see cref="MimeKit.Multipart"/> class.
 		/// </summary>
-		/// <remarks>This constructor is used by <see cref="MimeKit.MimeParser"/>.</remarks>
-		/// <param name="entity">Information used by the constructor.</param>
-		public Multipart (MimeEntityConstructorInfo entity) : base (entity)
+		/// <remarks>
+		/// This constructor is used by <see cref="MimeKit.MimeParser"/>.
+		/// </remarks>
+		/// <param name="args">Information used by the constructor.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="args"/> is <c>null</c>.
+		/// </exception>
+		public Multipart (MimeEntityConstructorArgs args) : base (args)
 		{
 			children = new List<MimeEntity> ();
 		}
@@ -248,6 +253,29 @@ namespace MimeKit {
 			}
 		}
 
+		/// <summary>
+		/// Dispatches to the specific visit method for this MIME entity.
+		/// </summary>
+		/// <remarks>
+		/// This default implementation for <see cref="MimeKit.MimeEntity"/> nodes
+		/// calls <see cref="MimeKit.MimeVisitor.VisitMimeEntity"/>. Override this
+		/// method to call into a more specific method on a derived visitor class
+		/// of the <see cref="MimeKit.MimeVisitor"/> class. However, it should still
+		/// support unknown visitors by calling
+		/// <see cref="MimeKit.MimeVisitor.VisitMimeEntity"/>.
+		/// </remarks>
+		/// <param name="visitor">The visitor.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="visitor"/> is <c>null</c>.
+		/// </exception>
+		public override void Accept (MimeVisitor visitor)
+		{
+			if (visitor == null)
+				throw new ArgumentNullException ("visitor");
+
+			visitor.VisitMultipart (this);
+		}
+
 		static string FoldPreambleOrEpilogue (FormatOptions options, string text)
 		{
 			var builder = new StringBuilder ();
@@ -340,11 +368,13 @@ namespace MimeKit {
 
 			base.WriteTo (options, stream, cancellationToken);
 
-			if (options.International && ContentType.Matches ("multipart", "signed")) {
+			if (ContentType.Matches ("multipart", "signed")) {
 				// don't reformat the headers or content of any children of a multipart/signed
-				options = options.Clone ();
-				options.HiddenHeaders.Clear ();
-				options.International = false;
+				if (options.International || options.HiddenHeaders.Count > 0) {
+					options = options.Clone ();
+					options.HiddenHeaders.Clear ();
+					options.International = false;
+				}
 			}
 
 			var cancellable = stream as ICancellableStream;

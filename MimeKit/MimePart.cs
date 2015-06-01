@@ -59,11 +59,16 @@ namespace MimeKit {
 
 		/// <summary>
 		/// Initializes a new instance of the <see cref="MimeKit.MimePart"/> class
-		/// based on the <see cref="MimeEntityConstructorInfo"/>.
+		/// based on the <see cref="MimeEntityConstructorArgs"/>.
 		/// </summary>
-		/// <remarks>This constructor is used by <see cref="MimeKit.MimeParser"/>.</remarks>
-		/// <param name="entity">Information used by the constructor.</param>
-		public MimePart (MimeEntityConstructorInfo entity) : base (entity)
+		/// <remarks>
+		/// This constructor is used by <see cref="MimeKit.MimeParser"/>.
+		/// </remarks>
+		/// <param name="args">Information used by the constructor.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="args"/> is <c>null</c>.
+		/// </exception>
+		public MimePart (MimeEntityConstructorArgs args) : base (args)
 		{
 		}
 
@@ -340,6 +345,29 @@ namespace MimeKit {
 		}
 
 		/// <summary>
+		/// Dispatches to the specific visit method for this MIME entity.
+		/// </summary>
+		/// <remarks>
+		/// This default implementation for <see cref="MimeKit.MimeEntity"/> nodes
+		/// calls <see cref="MimeKit.MimeVisitor.VisitMimeEntity"/>. Override this
+		/// method to call into a more specific method on a derived visitor class
+		/// of the <see cref="MimeKit.MimeVisitor"/> class. However, it should still
+		/// support unknown visitors by calling
+		/// <see cref="MimeKit.MimeVisitor.VisitMimeEntity"/>.
+		/// </remarks>
+		/// <param name="visitor">The visitor.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="visitor"/> is <c>null</c>.
+		/// </exception>
+		public override void Accept (MimeVisitor visitor)
+		{
+			if (visitor == null)
+				throw new ArgumentNullException ("visitor");
+
+			visitor.VisitMimePart (this);
+		}
+
+		/// <summary>
 		/// Calculates the most efficient content encoding given the specified constraint.
 		/// </summary>
 		/// <remarks>
@@ -436,6 +464,19 @@ namespace MimeKit {
 			}
 		}
 
+		static bool IsNullOrWhiteSpace (string value)
+		{
+			if (string.IsNullOrEmpty (value))
+				return true;
+
+			for (int i = 0; i < value.Length; i++) {
+				if (!char.IsWhiteSpace (value[i]))
+					return false;
+			}
+
+			return true;
+		}
+
 		/// <summary>
 		/// Verifies the Content-Md5 value against an independently computed md5sum.
 		/// </summary>
@@ -447,7 +488,7 @@ namespace MimeKit {
 		/// <returns><c>true</c>, if content MD5 checksum was verified, <c>false</c> otherwise.</returns>
 		public bool VerifyContentMd5 ()
 		{
-			if (string.IsNullOrWhiteSpace (md5sum) || ContentObject == null)
+			if (IsNullOrWhiteSpace (md5sum) || ContentObject == null)
 				return false;
 
 			return md5sum == ComputeContentMd5 ();

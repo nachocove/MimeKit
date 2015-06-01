@@ -43,8 +43,9 @@ using System.Net.Mail;
 using MimeKit.Cryptography;
 #endif
 
-using MimeKit.Utils;
 using MimeKit.IO;
+using MimeKit.Text;
+using MimeKit.Utils;
 
 namespace MimeKit {
 	/// <summary>
@@ -265,11 +266,12 @@ namespace MimeKit {
 					return;
 				}
 
+				var options = FormatOptions.Default;
 				var builder = new StringBuilder ();
 				int len = "Sender: ".Length;
 
-				value.Encode (FormatOptions.Default, builder, ref len);
-				builder.Append (FormatOptions.Default.NewLine);
+				value.Encode (options, builder, ref len);
+				builder.Append (options.NewLine);
 
 				var raw = Encoding.UTF8.GetBytes (builder.ToString ());
 
@@ -299,11 +301,12 @@ namespace MimeKit {
 					return;
 				}
 
+				var options = FormatOptions.Default;
 				var builder = new StringBuilder ();
 				int len = "Resent-Sender: ".Length;
 
-				value.Encode (FormatOptions.Default, builder, ref len);
-				builder.Append (FormatOptions.Default.NewLine);
+				value.Encode (options, builder, ref len);
+				builder.Append (options.NewLine);
 
 				var raw = Encoding.UTF8.GetBytes (builder.ToString ());
 
@@ -673,55 +676,27 @@ namespace MimeKit {
 			get; set;
 		}
 
-		static bool TryGetMultipartAlternativeBody (Multipart multipart, bool html, out string body)
+		static bool TryGetMultipartBody (Multipart multipart, TextFormat format, out string body)
 		{
-			// walk the multipart/alternative children backwards from greatest level of faithfulness to the least faithful
-			for (int i = multipart.Count - 1; i >= 0; i--) {
-				var related = multipart[i] as MultipartRelated;
-				TextPart text;
+			var alternative = multipart as MultipartAlternative;
 
-				if (related != null) {
-					text = related.Root as TextPart;
-				} else {
-					var mpart = multipart[i] as Multipart;
-
-					text = multipart[i] as TextPart;
-
-					if (mpart != null && mpart.ContentType.Matches ("multipart", "alternative")) {
-						// Note: nested multipart/alternatives make no sense... yet here we are.
-						if (TryGetMultipartAlternativeBody (mpart, html, out body))
-							return true;
-					}
-				}
-
-				if (text != null && (html ? text.IsHtml : text.IsPlain)) {
-					body = text.Text;
-					return true;
-				}
+			if (alternative != null) {
+				body = alternative.GetTextBody (format);
+				return body != null;
 			}
 
-			body = null;
-
-			return false;
-		}
-
-		static bool TryGetMessageBody (Multipart multipart, bool html, out string body)
-		{
 			var related = multipart as MultipartRelated;
 			Multipart multi;
 			TextPart text;
 
 			if (related == null) {
-				if (multipart.ContentType.Matches ("multipart", "alternative"))
-					return TryGetMultipartAlternativeBody (multipart, html, out body);
-
 				// Note: This is probably a multipart/mixed... and if not, we can still treat it like it is.
 				for (int i = 0; i < multipart.Count; i++) {
 					multi = multipart[i] as Multipart;
 
 					// descend into nested multiparts, if there are any...
 					if (multi != null) {
-						if (TryGetMessageBody (multi, html, out body))
+						if (TryGetMultipartBody (multi, format, out body))
 							return true;
 
 						// The text body should never come after a multipart.
@@ -733,8 +708,8 @@ namespace MimeKit {
 					// Look for the first non-attachment text part (realistically, the body text will
 					// preceed any attachments, but I'm not sure we can rely on that assumption).
 					if (text != null && !text.IsAttachment) {
-						if (html ? text.IsHtml : text.IsPlain) {
-							body = text.Text;
+						if (text.IsFormat (format)) {
+							body = MultipartAlternative.GetText (text);
 							return true;
 						}
 
@@ -750,7 +725,7 @@ namespace MimeKit {
 				text = root as TextPart;
 
 				if (text != null) {
-					body = (html ? text.IsHtml : text.IsPlain) ? text.Text : null;
+					body = text.IsFormat (format) ? text.Text : null;
 					return body != null;
 				}
 
@@ -758,7 +733,7 @@ namespace MimeKit {
 				multi = root as Multipart;
 
 				if (multi != null)
-					return TryGetMessageBody (multi, html, out body);
+					return TryGetMultipartBody (multi, format, out body);
 			}
 
 			body = null;
@@ -775,23 +750,7 @@ namespace MimeKit {
 		/// </remarks>
 		/// <value>The text body if it exists; otherwise, <c>null</c>.</value>
 		public string TextBody {
-			get {
-				var multipart = Body as Multipart;
-
-				if (multipart != null) {
-					string plain;
-
-					if (TryGetMessageBody (multipart, false, out plain))
-						return plain;
-				} else {
-					var text = Body as TextPart;
-
-					if (text != null && text.IsPlain)
-						return text.Text;
-				}
-
-				return null;
-			}
+			get { return GetTextBody (TextFormat.Text); }
 		}
 
 		/// <summary>
@@ -802,23 +761,34 @@ namespace MimeKit {
 		/// </remarks>
 		/// <value>The html body if it exists; otherwise, <c>null</c>.</value>
 		public string HtmlBody {
-			get {
-				var multipart = Body as Multipart;
+			get { return GetTextBody (TextFormat.Html); }
+		}
 
-				if (multipart != null) {
-					string html;
+		/// <summary>
+		/// Gets the text body in the specified format.
+		/// </summary>
+		/// <remarks>
+		/// Gets the text body in the specified format, if it exists.
+		/// </remarks>
+		/// <returns>The text body in the desired format if it exists; otherwise, <c>null</c>.</returns>
+		/// <param name="format">The desired text format.</param>
+		public string GetTextBody (TextFormat format)
+		{
+			var multipart = Body as Multipart;
 
-					if (TryGetMessageBody (multipart, true, out html))
-						return html;
-				} else {
-					var text = Body as TextPart;
+			if (multipart != null) {
+				string text;
 
-					if (text != null && text.IsHtml)
-						return text.Text;
-				}
+				if (TryGetMultipartBody (multipart, format, out text))
+					return text;
+			} else {
+				var body = Body as TextPart;
 
-				return null;
+				if (body != null && body.IsFormat (format))
+					return body.Text;
 			}
+
+			return null;
 		}
 
 		static IEnumerable<MimePart> EnumerateMimeParts (MimeEntity entity)
@@ -881,55 +851,47 @@ namespace MimeKit {
 		/// </summary>
 		/// <remarks>
 		/// <para>Returns a <see cref="System.String"/> that represents the current <see cref="MimeKit.MimeMessage"/>.</para>
-		/// <para>Note: In general, the string returned from this method should not be used for serializing the message
-		/// to disk. Instead, it is recommended that you use <see cref="WriteTo(Stream,CancellationToken)"/> instead.</para>
+		/// <para>Note: In general, the string returned from this method SHOULD NOT be used for serializing the message
+		/// to disk. It is recommended that you use <see cref="WriteTo(Stream,CancellationToken)"/> instead.</para>
 		/// </remarks>
 		/// <returns>A <see cref="System.String"/> that represents the current <see cref="MimeKit.MimeMessage"/>.</returns>
 		public override string ToString ()
 		{
-			bool isUnicodeSafe = true;
-
-			if (Body != null) {
-				foreach (var part in BodyParts) {
-					if (part.ContentTransferEncoding == ContentEncoding.Binary) {
-						isUnicodeSafe = false;
-						break;
-					}
-
-					var text = part as TextPart;
-
-					if (text != null) {
-						var charset = text.ContentType.Charset;
-
-						charset = charset != null ? charset.ToLowerInvariant () : "utf-8";
-
-						if (charset == "utf-8" && charset == "us-ascii")
-							continue;
-
-						isUnicodeSafe = false;
-						break;
-					}
-				}
-			}
-
 			using (var memory = new MemoryStream ()) {
-				var options = FormatOptions.Default.Clone ();
-				options.International = false;
+				WriteTo (FormatOptions.Default, memory);
 
-				WriteTo (options, memory);
-
-				#if !PORTABLE
+#if !PORTABLE
 				var buffer = memory.GetBuffer ();
-				#else
+#else
 				var buffer = memory.ToArray ();
-				#endif
+#endif
 				int count = (int) memory.Length;
-
-				if (isUnicodeSafe)
-					return CharsetUtils.UTF8.GetString (buffer, 0, count);
 
 				return CharsetUtils.Latin1.GetString (buffer, 0, count);
 			}
+		}
+
+		/// <summary>
+		/// Dispatches to the specific visit method for this MIME message.
+		/// </summary>
+		/// <remarks>
+		/// This default implementation for <see cref="MimeKit.MimeMessage"/> nodes
+		/// calls <see cref="MimeKit.MimeVisitor.VisitMimeMessage"/>. Override this
+		/// method to call into a more specific method on a derived visitor class
+		/// of the <see cref="MimeKit.MimeVisitor"/> class. However, it should still
+		/// support unknown visitors by calling
+		/// <see cref="MimeKit.MimeVisitor.VisitMimeMessage"/>.
+		/// </remarks>
+		/// <param name="visitor">The visitor.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="visitor"/> is <c>null</c>.
+		/// </exception>
+		public virtual void Accept (MimeVisitor visitor)
+		{
+			if (visitor == null)
+				throw new ArgumentNullException ("visitor");
+
+			visitor.VisitMimeMessage (this);
 		}
 
 		/// <summary>
@@ -990,8 +952,12 @@ namespace MimeKit {
 					filtered.Flush (cancellationToken);
 				}
 
-				options.WriteHeaders = false;
-				Body.WriteTo (options, stream, cancellationToken);
+				try {
+					Body.Headers.Suppress = true;
+					Body.WriteTo (options, stream, cancellationToken);
+				} finally {
+					Body.Headers.Suppress = false;
+				}
 			}
 		}
 
@@ -1275,7 +1241,7 @@ namespace MimeKit {
 			if (ctx is SecureMimeContext) {
 				Body = ApplicationPkcs7Mime.Encrypt ((SecureMimeContext) ctx, recipients, Body);
 			} else if (ctx is OpenPgpContext) {
-				Body = MultipartEncrypted.Create ((OpenPgpContext) ctx, recipients, Body);
+				Body = MultipartEncrypted.Encrypt ((OpenPgpContext) ctx, recipients, Body);
 			} else {
 				throw new ArgumentException ("Unknown type of cryptography context.", "ctx");
 			}
@@ -1345,7 +1311,7 @@ namespace MimeKit {
 			if (ctx is SecureMimeContext) {
 				Body = ApplicationPkcs7Mime.SignAndEncrypt ((SecureMimeContext) ctx, signer, digestAlgo, recipients, Body);
 			} else if (ctx is OpenPgpContext) {
-				Body = MultipartEncrypted.Create ((OpenPgpContext) ctx, signer, digestAlgo, recipients, Body);
+				Body = MultipartEncrypted.SignAndEncrypt ((OpenPgpContext) ctx, signer, digestAlgo, recipients, Body);
 			} else {
 				throw new ArgumentException ("Unknown type of cryptography context.", "ctx");
 			}
@@ -1460,10 +1426,11 @@ namespace MimeKit {
 		void SerializeAddressList (string field, InternetAddressList list)
 		{
 			var builder = new StringBuilder (" ");
+			var options = FormatOptions.Default;
 			int lineLength = field.Length + 2;
 
-			list.Encode (FormatOptions.Default, builder, ref lineLength);
-			builder.Append (FormatOptions.Default.NewLine);
+			list.Encode (options, builder, ref lineLength);
+			builder.Append (options.NewLine);
 
 			var raw = Encoding.UTF8.GetBytes (builder.ToString ());
 
@@ -2023,13 +1990,18 @@ namespace MimeKit {
 				msg.Sender = (MailboxAddress) message.Sender;
 			if (msg.From.Count == 0 && message.From != null)
 				msg.From.Add ((MailboxAddress) message.From);
-			if (msg.ReplyTo.Count == 0)
+#if NET_3_5
+			if (msg.ReplyTo.Count == 0 && message.ReplyTo != null)
+				msg.ReplyTo.Add ((MailboxAddress) message.ReplyTo);
+#else
+			if (msg.ReplyTo.Count == 0 && message.ReplyToList.Count > 0)
 				msg.ReplyTo.AddRange ((InternetAddressList) message.ReplyToList);
-			if (msg.To.Count == 0)
+#endif
+			if (msg.To.Count == 0 && message.To.Count > 0)
 				msg.To.AddRange ((InternetAddressList) message.To);
-			if (msg.Cc.Count == 0)
+			if (msg.Cc.Count == 0 && message.CC.Count > 0)
 				msg.Cc.AddRange ((InternetAddressList) message.CC);
-			if (msg.Bcc.Count == 0)
+			if (msg.Bcc.Count == 0 && message.Bcc.Count > 0)
 				msg.Bcc.AddRange ((InternetAddressList) message.Bcc);
 			if (string.IsNullOrEmpty (msg.Subject))
 				msg.Subject = message.Subject ?? string.Empty;
