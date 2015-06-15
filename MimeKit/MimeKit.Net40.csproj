@@ -70,10 +70,18 @@
     <Compile Include="Cryptography\DigestAlgorithm.cs" />
     <Compile Include="Cryptography\DigitalSignatureCollection.cs" />
     <Compile Include="Cryptography\DigitalSignatureVerifyException.cs" />
+    <Compile Include="Cryptography\DkimCanonicalizationAlgorithm.cs" />
+    <Compile Include="Cryptography\DkimHashStream.cs" />
+    <Compile Include="Cryptography\DkimRelaxedBodyFilter.cs" />
+    <Compile Include="Cryptography\DkimSignatureAlgorithm.cs" />
+    <Compile Include="Cryptography\DkimSignatureStream.cs" />
+    <Compile Include="Cryptography\DkimSigner.cs" />
+    <Compile Include="Cryptography\DkimSimpleBodyFilter.cs" />
     <Compile Include="Cryptography\EncryptionAlgorithm.cs" />
     <Compile Include="Cryptography\GnuPGContext.cs" />
     <Compile Include="Cryptography\IDigitalCertificate.cs" />
     <Compile Include="Cryptography\IDigitalSignature.cs" />
+    <Compile Include="Cryptography\IDkimPublicKeyLocator.cs" />
     <Compile Include="Cryptography\IX509CertificateDatabase.cs" />
     <Compile Include="Cryptography\MultipartEncrypted.cs" />
     <Compile Include="Cryptography\MultipartSigned.cs" />
@@ -140,16 +148,23 @@
     <Compile Include="Text\HtmlAttribute.cs" />
     <Compile Include="Text\HtmlAttributeCollection.cs" />
     <Compile Include="Text\HtmlAttributeId.cs" />
-    <Compile Include="Text\HtmlAttributeReader.cs" />
-    <Compile Include="Text\HtmlReader.cs" />
+    <Compile Include="Text\HtmlEntityDecoder.cs" />
+    <Compile Include="Text\HtmlEntityDecoder.g.cs">
+      <DependentUpon>Text\HtmlEntityDecoder.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Text\HtmlNamespace.cs" />
+    <Compile Include="Text\HtmlTagCallback.cs" />
     <Compile Include="Text\HtmlTagContext.cs" />
     <Compile Include="Text\HtmlTagId.cs" />
     <Compile Include="Text\HtmlToHtml.cs" />
     <Compile Include="Text\HtmlToken.cs" />
+    <Compile Include="Text\HtmlTokenizer.cs" />
+    <Compile Include="Text\HtmlTokenizerState.cs" />
     <Compile Include="Text\HtmlTokenKind.cs" />
     <Compile Include="Text\HtmlUtils.cs" />
     <Compile Include="Text\HtmlWriter.cs" />
     <Compile Include="Text\HtmlWriterState.cs" />
+    <Compile Include="Text\ICharArray.cs" />
     <Compile Include="Text\TextConverter.cs" />
     <Compile Include="Text\TextFormat.cs" />
     <Compile Include="Text\TextToFlowed.cs" />

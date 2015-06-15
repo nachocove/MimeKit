@@ -194,7 +194,7 @@ namespace MimeKit {
 				throw new ArgumentNullException ("field");
 
 			for (int i = 0; i < headers.Count; i++) {
-				if (headers[i].Field == field)
+				if (icase.Compare (headers[i].Field, field) == 0)
 					return i;
 			}
 
@@ -252,6 +252,54 @@ namespace MimeKit {
 				throw new ArgumentOutOfRangeException ("index");
 
 			Insert (index, new Header (field, value));
+		}
+
+		/// <summary>
+		/// Gets the last index of the requested header, if it exists.
+		/// </summary>
+		/// <remarks>
+		/// Finds the last index of the specified header, if it exists.
+		/// </remarks>
+		/// <returns>The last index of the requested header; otherwise <value>-1</value>.</returns>
+		/// <param name="id">The header id.</param>
+		/// <exception cref="System.ArgumentOutOfRangeException">
+		/// <paramref name="id"/> is not a valid <see cref="HeaderId"/>.
+		/// </exception>
+		public int LastIndexOf (HeaderId id)
+		{
+			if (id == HeaderId.Unknown)
+				throw new ArgumentOutOfRangeException ("id");
+
+			for (int i = headers.Count - 1; i >= 0; i--) {
+				if (headers[i].Id == id)
+					return i;
+			}
+
+			return -1;
+		}
+
+		/// <summary>
+		/// Gets the last index of the requested header, if it exists.
+		/// </summary>
+		/// <remarks>
+		/// Finds the last index of the specified header, if it exists.
+		/// </remarks>
+		/// <returns>The last index of the requested header; otherwise <value>-1</value>.</returns>
+		/// <param name="field">The name of the header field.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="field"/> is <c>null</c>.
+		/// </exception>
+		public int LastIndexOf (string field)
+		{
+			if (field == null)
+				throw new ArgumentNullException ("field");
+
+			for (int i = headers.Count - 1; i >= 0; i--) {
+				if (icase.Compare (headers[i].Field, field) == 0)
+					return i;
+			}
+
+			return -1;
 		}
 
 		/// <summary>
@@ -664,20 +712,23 @@ namespace MimeKit {
 				filtered.Add (options.CreateNewLineFilter ());
 
 				foreach (var header in headers) {
-					byte[] rawValue;
+					var rawValue = header.GetRawValue (options);
 
 					filtered.Write (header.RawField, 0, header.RawField.Length, cancellationToken);
 					filtered.Write (new [] { (byte) ':' }, 0, 1, cancellationToken);
-
-					if (options.International)
-						rawValue = header.GetRawValue (options, Encoding.UTF8);
-					else
-						rawValue = header.RawValue;
-
 					filtered.Write (rawValue, 0, rawValue.Length, cancellationToken);
 				}
 
 				filtered.Flush (cancellationToken);
+			}
+
+			var cancellable = stream as ICancellableStream;
+
+			if (cancellable != null) {
+				cancellable.Write (options.NewLineBytes, 0, options.NewLineBytes.Length, cancellationToken);
+			} else {
+				cancellationToken.ThrowIfCancellationRequested ();
+				stream.Write (options.NewLineBytes, 0, options.NewLineBytes.Length);
 			}
 		}
 

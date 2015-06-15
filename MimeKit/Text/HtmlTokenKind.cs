@@ -26,40 +26,40 @@
 
 namespace MimeKit.Text {
 	/// <summary>
-	/// An enumeration of the kinds of tokens that the <see cref="HtmlReader"/> can encounter.
+	/// The kinds of tokens that the <see cref="HtmlTokenizer"/> can emit.
 	/// </summary>
 	/// <remarks>
-	/// An enumeration of the kinds of tokens that the <see cref="HtmlReader"/> can encounter.
+	/// The kinds of tokens that the <see cref="HtmlTokenizer"/> can emit.
 	/// </remarks>
-	enum HtmlTokenKind {
+	public enum HtmlTokenKind {
 		/// <summary>
-		/// The current token is text between an HTML start tag and an HTML end tag.
+		/// A token consisting of <c>[CDATA[</c>.
 		/// </summary>
-		Text,
+		CData,
 
 		/// <summary>
-		/// The current token is an HTML start tag such as <c>&lt;A&gt;</c>
-		/// </summary>
-		StartTag,
-
-		/// <summary>
-		/// The token current is an HTML end tag such as <c>&lt;/A&gt;</c>
-		/// </summary>
-		EndTag,
-
-		/// <summary>
-		/// The current token is an HTML tag that does not contain any child elements, such as <c>&lt;BR&gt;</c>
-		/// </summary>
-		EmptyElementTag,
-
-		/// <summary>
-		/// The current token is an HTML comment.
+		/// An HTML comment token.
 		/// </summary>
 		Comment,
 
 		/// <summary>
-		/// The current token is an HTML DOCTYPE tag.
+		/// A token consisting of character data.
+		/// </summary>
+		Data,
+
+		/// <summary>
+		/// An HTML DOCTYPE token.
 		/// </summary>
 		DocType,
+
+		/// <summary>
+		/// A token consisting of script data.
+		/// </summary>
+		ScriptData,
+
+		/// <summary>
+		/// An HTML tag token.
+		/// </summary>
+		Tag,
 	}
 }

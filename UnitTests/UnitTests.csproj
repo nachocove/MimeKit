@@ -3,8 +3,6 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProductVersion>8.0.30703</ProductVersion>
-    <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{0225FDB7-CF63-4402-BB30-9B149AC06C2E}</ProjectGuid>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <OutputType>Library</OutputType>
@@ -60,11 +58,11 @@
     <Compile Include="ContentDispositionTests.cs" />
     <Compile Include="ContentTypeTests.cs" />
     <Compile Include="DateParserTests.cs" />
+    <Compile Include="DkimTests.cs" />
     <Compile Include="DummyOpenPgpContext.cs" />
     <Compile Include="DummySecureMimeContext.cs" />
     <Compile Include="EncoderTests.cs" />
     <Compile Include="HeaderTests.cs" />
-    <Compile Include="HtmlReaderTests.cs" />
     <Compile Include="InternetAddressListTests.cs" />
     <Compile Include="MemoryBlockStreamTests.cs" />
     <Compile Include="MessagePartialTests.cs" />
@@ -80,11 +78,22 @@
     <Compile Include="UrlScannerTests.cs" />
     <Compile Include="X509CertificateStoreTests.cs" />
     <Compile Include="YEncodingTests.cs" />
+    <Compile Include="HtmlTokenizerTests.cs" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="TestData\dkim\example.bind9" />
+    <None Include="TestData\dkim\example.pem" />
+    <None Include="TestData\dkim\example.pub" />
+    <None Include="TestData\dkim\example.tinydns" />
+    <None Include="TestData\dkim\gmail.msg" />
+    <None Include="TestData\dkim\gmail.pub" />
     <None Include="TestData\encoders\photo.b64" />
     <None Include="TestData\encoders\photo.jpg" />
     <None Include="TestData\encoders\photo.uu" />
+    <None Include="TestData\html\blocked.html" />
+    <None Include="TestData\html\blocked.tokens" />
+    <None Include="TestData\html\test.html" />
+    <None Include="TestData\html\test.tokens" />
     <None Include="TestData\html\xamarin3.html" />
     <None Include="TestData\html\xamarin3.tokens" />
     <None Include="TestData\html\xamarin3.xhtml" />
@@ -153,7 +162,4 @@
     <Copy Condition="$(OS) != 'Unix'" SourceFiles="..\lib\sqlite3.dll" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" ContinueOnError="false" />
   </Target>
   -->
-  <ItemGroup>
-    <Folder Include="TestData\html\" />
-  </ItemGroup>
 </Project>
