@@ -139,7 +139,7 @@ namespace MimeKit {
 			AddressParserComplianceMode = RfcComplianceMode.Loose;
 			ParameterComplianceMode = RfcComplianceMode.Loose;
 			Rfc2047ComplianceMode = RfcComplianceMode.Loose;
-			CharsetEncoding = Encoding.Default;
+			CharsetEncoding = CharsetUtils.UTF8;
 			RespectContentLength = false;
 		}
 
@@ -220,7 +220,7 @@ namespace MimeKit {
 
 			mimeType = mimeType.ToLowerInvariant ();
 
-#if PORTABLE
+#if PORTABLE || COREFX
 			var info = type.GetTypeInfo ();
 #else
 			var info = type;
@@ -293,6 +293,8 @@ namespace MimeKit {
 				switch (subtype) {
 				case "disposition-notification":
 					return new MessageDispositionNotification (args);
+				case "delivery-status":
+					return new MessageDeliveryStatus (args);
 				case "partial":
 					if (!IsEncoded (headers))
 						return new MessagePartial (args);

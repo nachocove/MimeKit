@@ -4,5 +4,6 @@ Mono.Data.Sqlite/Documentation
 *.suo
 .DS_Store
 test-results
+packages
 obj
 bin

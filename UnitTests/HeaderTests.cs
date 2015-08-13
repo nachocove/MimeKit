@@ -134,6 +134,18 @@ namespace UnitTests {
 		}
 
 		[Test]
+		public void TestDkimSignatureHeaderFolding ()
+		{
+			var header = new Header ("UTF-8", "DKIM-Signature", "v=1; a=rsa-sha256; c=simple/simple; d=maillist.codeproject.com; s=mail; t=1435835767; bh=tiafHSAvEg4GPJlbkR6e7qr1oydTj+ZXs392TcHwwvs=; h=MIME-Version:From:To:Date:Subject:Content-Type:Content-Transfer-Encoding:Message-Id; b=Qtgo0bWwT0H18CxD2+ey8/382791TBNYtZ8VOLlXxxsbw5fab8uEo53o5tPun6kNx4khmJx/yWowvrCOAcMoqgNO7Hb7JB8NR7eNyOvtLKCG34AfDZyHNcTZHR/QnBpRKHssu5w2CQDUAjKnuGKRW95LCMMX3r924dErZOJnGhs=");
+			var expected = " v=1; a=rsa-sha256; c=simple/simple;\n\td=maillist.codeproject.com; s=mail; t=1435835767;\n\tbh=tiafHSAvEg4GPJlbkR6e7qr1oydTj+ZXs392TcHwwvs=;\n\th=MIME-Version:From:To:Date:Subject:Content-Type:Content-Transfer-Encoding:\n\tMessage-Id;\n\tb=Qtgo0bWwT0H18CxD2+ey8/382791TBNYtZ8VOLlXxxsbw5fab8uEo53o5tPun6kNx4khmJx/yWo\n\twvrCOAcMoqgNO7Hb7JB8NR7eNyOvtLKCG34AfDZyHNcTZHR/QnBpRKHssu5w2CQDUAjKnuGKRW95L\n\tCMMX3r924dErZOJnGhs=\n";
+			var raw = ByteArrayToString (header.RawValue);
+
+			expected = expected.Replace ("\n", Environment.NewLine);
+
+			Assert.AreEqual (expected, raw, "The RawValue does not match the expected value.");
+		}
+
+		[Test]
 		public void TestUnstructuredHeaderFolding ()
 		{
 			var header = new Header ("Subject", "This is a subject value that should be long enough to force line wrapping to keep the line length under the 78 character limit.");
@@ -199,31 +211,57 @@ namespace UnitTests {
 		}
 
 		[Test]
+		public void TestJapaneseISO2022JPHeaderDecoding ()
+		{
+			const string input = "Subject: =?ISO-2022-JP?B?GyRCRnxLXDhsJWEhPCVrJUYlOSVIGyhCICh0ZXN0aW5nIEph?=\n =?ISO-2022-JP?B?cGFuZXNlIGVtYWlscyk=?=";
+			const string expected = "日本語メールテスト (testing Japanese emails)";
+			Header header;
+
+			Assert.IsTrue (Header.TryParse (input, out header), "Failed to parse Japanese Subject header.");
+			Assert.AreEqual (HeaderId.Subject, header.Id, "HeaderId does not match");
+			Assert.AreEqual (expected, header.Value, "Subject values do not match.");
+		}
+
+		[Test]
 		public void TestReplacingHeaders ()
 		{
 			const string ReplacedContentType = "text/plain; charset=iso-8859-1; name=body.txt";
 			const string ReplacedContentDisposition = "inline; filename=body.txt";
+			const string ReplacedContentLocation = "http://www.example.com/location";
 			const string ReplacedContentId = "<content.id.2@localhost>";
 			var headers = new HeaderList ();
 
-			headers.Add ("Content-Type", "text/plain");
 			headers.Add ("Content-Disposition", "attachment");
 			headers.Add ("Content-Id", "<content-id.1@localhost>");
+			headers.Add ("Content-Location", "C:\\location");
+			headers.Insert (0, "Content-Type", "text/plain");
+
+			Assert.IsTrue (headers.Contains (HeaderId.ContentType), "Expected the list of headers to contain HeaderId.ContentType.");
+			Assert.IsTrue (headers.Contains ("Content-Type"), "Expected the list of headers to contain a Content-Type header.");
+			Assert.AreEqual (0, headers.LastIndexOf (HeaderId.ContentType), "Expected the Content-Type header to be the first header.");
 
 			headers.Replace ("Content-Disposition", ReplacedContentDisposition);
-			Assert.AreEqual (3, headers.Count, "Unexpected number of headers after replacing Content-Disposition.");
+			Assert.AreEqual (4, headers.Count, "Unexpected number of headers after replacing Content-Disposition.");
 			Assert.AreEqual (ReplacedContentDisposition, headers["Content-Disposition"], "Content-Disposition has unexpected value after replacing it.");
 			Assert.AreEqual (1, headers.IndexOf ("Content-Disposition"), "Replaced Content-Disposition not in the expected position.");
 
-			headers.Replace ("Content-Type", ReplacedContentType);
-			Assert.AreEqual (3, headers.Count, "Unexpected number of headers after replacing Content-Type.");
+			headers.Replace (HeaderId.ContentType, "UTF-8", ReplacedContentType);
+			Assert.AreEqual (4, headers.Count, "Unexpected number of headers after replacing Content-Type.");
 			Assert.AreEqual (ReplacedContentType, headers["Content-Type"], "Content-Type has unexpected value after replacing it.");
 			Assert.AreEqual (0, headers.IndexOf ("Content-Type"), "Replaced Content-Type not in the expected position.");
 
-			headers.Replace ("Content-Id", ReplacedContentId);
-			Assert.AreEqual (3, headers.Count, "Unexpected number of headers after replacing Content-Id.");
+			headers.Replace (HeaderId.ContentId, Encoding.UTF8, ReplacedContentId);
+			Assert.AreEqual (4, headers.Count, "Unexpected number of headers after replacing Content-Id.");
 			Assert.AreEqual (ReplacedContentId, headers["Content-Id"], "Content-Id has unexpected value after replacing it.");
 			Assert.AreEqual (2, headers.IndexOf ("Content-Id"), "Replaced Content-Id not in the expected position.");
+
+			headers.Replace ("Content-Location", Encoding.UTF8, ReplacedContentLocation);
+			Assert.AreEqual (4, headers.Count, "Unexpected number of headers after replacing Content-Location.");
+			Assert.AreEqual (ReplacedContentLocation, headers["Content-Location"], "Content-Location has unexpected value after replacing it.");
+			Assert.AreEqual (3, headers.IndexOf ("Content-Location"), "Replaced Content-Location not in the expected position.");
+
+			headers.RemoveAll ("Content-Location");
+			Assert.AreEqual (3, headers.Count, "Unexpected number of headers after removing Content-Location.");
 		}
 
 		[Test]

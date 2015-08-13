@@ -15,7 +15,7 @@
     <MonoAndroidAssetsPrefix>Assets</MonoAndroidAssetsPrefix>
     <AndroidUseLatestPlatformSdk>False</AndroidUseLatestPlatformSdk>
     <AssemblyName>MimeKit</AssemblyName>
-    <TargetFrameworkVersion>v2.3</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.0.3</TargetFrameworkVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -23,7 +23,7 @@
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\lib\MonoAndroid</OutputPath>
     <IntermediateOutputPath>obj\Debug\lib\MonoAndroid</IntermediateOutputPath>
-    <DefineConstants>DEBUG;ENABLE_CRYPTO;ENABLE_SNM;__MOBILE__;__ANDROID__</DefineConstants>
+    <DefineConstants>DEBUG;SERIALIZABLE;ENABLE_CRYPTO;ENABLE_SNM;__MOBILE__;__ANDROID__</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <AndroidLinkMode>None</AndroidLinkMode>
@@ -39,7 +39,7 @@
     <AndroidUseSharedRuntime>false</AndroidUseSharedRuntime>
     <ConsolePause>false</ConsolePause>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <DefineConstants>ENABLE_CRYPTO;ENABLE_SNM;__MOBILE__;__ANDROID__</DefineConstants>
+    <DefineConstants>SERIALIZABLE;ENABLE_CRYPTO;ENABLE_SNM;__MOBILE__;__ANDROID__</DefineConstants>
     <DocumentationFile>bin\Release\lib\MonoAndroid\MimeKit.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup>
@@ -57,7 +57,7 @@
     <Reference Include="Mono.Data.Sqlite" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\bc-csharp\crypto\BouncyCastle.Android.csproj">
+    <ProjectReference Include="..\submodules\bc-csharp\crypto\BouncyCastle.Android.csproj">
       <Project>{A0D302CB-8866-4AB1-98B9-F0772EABF5DF}</Project>
       <Name>BouncyCastle.Android</Name>
     </ProjectReference>
@@ -155,7 +155,7 @@
     <Compile Include="Text\HtmlAttributeId.cs" />
     <Compile Include="Text\HtmlEntityDecoder.cs" />
     <Compile Include="Text\HtmlEntityDecoder.g.cs">
-      <DependentUpon>Text\HtmlEntityDecoder.cs</DependentUpon>
+      <DependentUpon>HtmlEntityDecoder.cs</DependentUpon>
     </Compile>
     <Compile Include="Text\HtmlNamespace.cs" />
     <Compile Include="Text\HtmlTagCallback.cs" />
@@ -218,14 +218,18 @@
     <Compile Include="HeaderId.cs" />
     <Compile Include="HeaderList.cs" />
     <Compile Include="HeaderListChangedEventArgs.cs" />
+    <Compile Include="HeaderListCollection.cs" />
     <Compile Include="IContentObject.cs" />
     <Compile Include="InternetAddress.cs" />
     <Compile Include="InternetAddressList.cs" />
     <Compile Include="MailboxAddress.cs" />
+    <Compile Include="MessageDeliveryStatus.cs" />
     <Compile Include="MessageDispositionNotification.cs" />
     <Compile Include="MessageIdList.cs" />
+    <Compile Include="MessageImportance.cs" />
     <Compile Include="MessagePart.cs" />
     <Compile Include="MessagePartial.cs" />
+    <Compile Include="MessagePriority.cs" />
     <Compile Include="MimeEntity.cs" />
     <Compile Include="MimeEntityConstructorArgs.cs" />
     <Compile Include="MimeFormat.cs" />

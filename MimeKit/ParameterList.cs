@@ -25,6 +25,7 @@
 //
 
 using System;
+using System.IO;
 using System.Text;
 using System.Collections;
 using System.Collections.Generic;
@@ -47,8 +48,6 @@ namespace MimeKit {
 	/// </remarks>
 	public class ParameterList : IList<Parameter>
 	{
-		static readonly StringComparer icase = StringComparer.OrdinalIgnoreCase;
-
 		readonly Dictionary<string, Parameter> table;
 		readonly List<Parameter> parameters;
 
@@ -60,7 +59,7 @@ namespace MimeKit {
 		/// </remarks>
 		public ParameterList ()
 		{
-			table = new Dictionary<string, Parameter> (icase);
+			table = new Dictionary<string, Parameter> (StringComparer.OrdinalIgnoreCase);
 			parameters = new List<Parameter> ();
 		}
 
@@ -502,7 +501,7 @@ namespace MimeKit {
 				if (param == value)
 					return;
 
-				if (icase.Compare (param.Name, value.Name) == 0) {
+				if (param.Name.Equals (value.Name, StringComparison.OrdinalIgnoreCase)) {
 					// replace the old param with the new one
 					if (table[param.Name] == param)
 						table[param.Name] = value;
@@ -608,6 +607,7 @@ namespace MimeKit {
 			public int ValueLength;
 			public int ValueStart;
 			public bool Encoded;
+			public byte[] Value;
 			public string Name;
 			public int? Id;
 
@@ -627,9 +627,10 @@ namespace MimeKit {
 
 		static bool TryParseNameValuePair (ParserOptions options, byte[] text, ref int index, int endIndex, bool throwOnError, out NameValuePair pair)
 		{
-			int valueIndex, startIndex;
+			int valueIndex, valueLength, startIndex;
 			bool encoded = false;
 			int? id = null;
+			byte[] value;
 			string name;
 
 			pair = null;
@@ -671,8 +672,8 @@ namespace MimeKit {
 					return false;
 				}
 
-				int value;
-				if (ParseUtils.TryParseInt32 (text, ref index, endIndex, out value)) {
+				int identifier;
+				if (ParseUtils.TryParseInt32 (text, ref index, endIndex, out identifier)) {
 					if (!ParseUtils.SkipCommentsAndWhiteSpace (text, ref index, endIndex, throwOnError))
 						return false;
 
@@ -698,7 +699,7 @@ namespace MimeKit {
 						}
 					}
 
-					id = value;
+					id = identifier;
 				} else {
 					encoded = true;
 				}
@@ -728,23 +729,54 @@ namespace MimeKit {
 			}
 
 			valueIndex = index;
+			value = text;
 
 			if (text[index] == (byte) '"') {
 				ParseUtils.SkipQuoted (text, ref index, endIndex, throwOnError);
+				valueLength = index - valueIndex;
 			} else if (options.ParameterComplianceMode == RfcComplianceMode.Strict) {
 				ParseUtils.SkipToken (text, ref index, endIndex);
+				valueLength = index - valueIndex;
 			} else {
 				// Note: Google Docs, for example, does not always quote name/filename parameters
 				// with spaces in the name. See https://github.com/jstedfast/MimeKit/issues/106
 				// for details.
 				while (index < endIndex && text[index] != (byte) ';' && text[index] != (byte) '\r' && text[index] != (byte) '\n')
 					index++;
+
+				valueLength = index - valueIndex;
+
+				if (index < endIndex && text[index] != (byte) ';') {
+					// Note: https://github.com/jstedfast/MimeKit/issues/159 adds to this suckage
+					// by having a multi-line unquoted value with spaces... don't you just love
+					// mail software written by people who have never heard of standards?
+					using (var memory = new MemoryStream ()) {
+						memory.Write (text, valueIndex, valueLength);
+
+						do {
+							while (index < endIndex && (text[index] == (byte) '\r' || text[index] == (byte) '\n'))
+								index++;
+
+							valueIndex = index;
+
+							while (index < endIndex && text[index] != (byte) ';' && text[index] != (byte) '\r' && text[index] != (byte) '\n')
+								index++;
+
+							memory.Write (text, valueIndex, index - valueIndex);
+						} while (index < endIndex && text[index] != ';');
+
+						value = memory.ToArray ();
+						valueLength = value.Length;
+						valueIndex = 0;
+					}
+				}
 			}
 
 			pair = new NameValuePair {
-				ValueLength = index - valueIndex,
+				ValueLength = valueLength,
 				ValueStart = valueIndex,
 				Encoded = encoded,
+				Value = value,
 				Name = name,
 				Id = id
 			};
@@ -824,7 +856,7 @@ namespace MimeKit {
 
 		internal static bool TryParse (ParserOptions options, byte[] text, ref int index, int endIndex, bool throwOnError, out ParameterList paramList)
 		{
-			var rfc2184 = new Dictionary<string, List<NameValuePair>> (icase);
+			var rfc2184 = new Dictionary<string, List<NameValuePair>> (StringComparer.OrdinalIgnoreCase);
 			var @params = new List<NameValuePair> ();
 			List<NameValuePair> parts;
 
@@ -882,6 +914,7 @@ namespace MimeKit {
 			foreach (var param in @params) {
 				int startIndex = param.ValueStart;
 				int length = param.ValueLength;
+				var buffer = param.Value;
 				Decoder decoder = null;
 				string value;
 
@@ -893,29 +926,30 @@ namespace MimeKit {
 					for (int i = 0; i < parts.Count; i++) {
 						startIndex = parts[i].ValueStart;
 						length = parts[i].ValueLength;
+						buffer = parts[i].Value;
 
 						if (parts[i].Encoded) {
-							bool flush = i + 1 >= parts.Count || !parts[i+1].Encoded;
+							bool flush = i + 1 >= parts.Count || !parts[i + 1].Encoded;
 
 							// Note: Some mail clients mistakenly quote encoded parameter values when they shouldn't
-							if (length >= 2 && text[startIndex] == (byte) '"' && text[startIndex + length - 1] == (byte) '"') {
+							if (length >= 2 && buffer[startIndex] == (byte) '"' && buffer[startIndex + length - 1] == (byte) '"') {
 								startIndex++;
 								length -= 2;
 							}
 
-							value += DecodeRfc2184 (ref decoder, hex, text, startIndex, length, flush);
-						} else if (length >= 2 && text[startIndex] == (byte) '"') {
-							var quoted = CharsetUtils.ConvertToUnicode (options, text, startIndex, length);
+							value += DecodeRfc2184 (ref decoder, hex, buffer, startIndex, length, flush);
+						} else if (length >= 2 && buffer[startIndex] == (byte) '"') {
+							var quoted = CharsetUtils.ConvertToUnicode (options,buffer, startIndex, length);
 							value += MimeUtils.Unquote (quoted);
 							hex.Reset ();
 						} else if (length > 0) {
-							value += CharsetUtils.ConvertToUnicode (options, text, startIndex, length);
+							value += CharsetUtils.ConvertToUnicode (options, buffer, startIndex, length);
 							hex.Reset ();
 						}
 					}
 					hex.Reset ();
 				} else if (param.Encoded) {
-					value = DecodeRfc2184 (ref decoder, hex, text, startIndex, length, true);
+					value = DecodeRfc2184 (ref decoder, hex, buffer, startIndex, length, true);
 					hex.Reset ();
 				} else if (!paramList.Contains (param.Name)) {
 					// Note: If we've got an rfc2184-encoded version of the same parameter, then
@@ -928,10 +962,10 @@ namespace MimeKit {
 					// any suggestions for dealing with this, following rfc6266 seems to make the
 					// most sense, even though it is meant for HTTP clients and servers.
 					if (length >= 2 && text[startIndex] == (byte) '"') {
-						var quoted = Rfc2047.DecodeText (options, text, startIndex, length);
+						var quoted = Rfc2047.DecodeText (options, buffer, startIndex, length);
 						value = MimeUtils.Unquote (quoted);
 					} else if (length > 0) {
-						value = Rfc2047.DecodeText (options, text, startIndex, length);
+						value = Rfc2047.DecodeText (options, buffer, startIndex, length);
 					} else {
 						value = string.Empty;
 					}

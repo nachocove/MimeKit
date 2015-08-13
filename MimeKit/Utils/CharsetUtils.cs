@@ -103,7 +103,7 @@ namespace MimeKit.Utils {
 			AddAliases (aliases, 51932, -1, "eucjp-0", "euc-jp", "ujis-0", "ujis");
 
 			// Japanese charsets (aliases for Shift_JIS)
-			AddAliases (aliases, 932, -1, "jisx0208.1983-0", "jisx0212.1990-0", "pck");
+			AddAliases (aliases, 932, -1, "shift_jis", "jisx0208.1983-0", "jisx0212.1990-0", "pck");
 
 			// Note from http://msdn.microsoft.com/en-us/library/system.text.encoding.getencodings.aspx
 			// Encodings 50220 and 50222 are both associated with the name "iso-2022-jp", but they
@@ -116,6 +116,7 @@ namespace MimeKit.Utils {
 			// If your application requests the encoding name "iso-2022-jp", the .NET Framework
 			// returns encoding 50220. However, the encoding that is appropriate for your application
 			// will depend on the preferred treatment of the half-width Katakana characters.
+			AddAliases (aliases, 50220, -1, "iso-2022-jp");
 		}
 
 		static bool ProbeCharset (int codepage)
@@ -144,10 +145,12 @@ namespace MimeKit.Utils {
 				throw new ArgumentNullException ("encoding");
 
 			switch (encoding.CodePage) {
-			case 949: // ks_c_5601-1987
-				return "euc-kr";
+			case 932:   return "iso-2022-jp"; // shift_jis
+			case 949:   return "euc-kr";      // ks_c_5601-1987
+			case 50221: return "iso-2022-jp"; // csISO2022JP
+			case 50225: return "euc-kr";      // iso-2022-kr
 			default:
-				return encoding.HeaderName.ToLowerInvariant ();
+				return encoding.WebName.ToLowerInvariant ();
 			}
 		}
 
@@ -293,20 +296,23 @@ namespace MimeKit.Utils {
 							encoding = Encoding.GetEncoding (charset);
 							codepage = encoding.CodePage;
 
-							aliases[encoding.HeaderName] = codepage;
+							if (!aliases.ContainsKey (encoding.WebName))
+								aliases[encoding.WebName] = codepage;
 						} catch {
 							codepage = -1;
 						}
 					} else {
 						try {
 							encoding = Encoding.GetEncoding (codepage);
-							aliases[encoding.HeaderName] = codepage;
+							if (!aliases.ContainsKey (encoding.WebName))
+								aliases[encoding.WebName] = codepage;
 						} catch {
 							codepage = -1;
 						}
 					}
 
-					aliases[charset] = codepage;
+					if (!aliases.ContainsKey (charset))
+						aliases[charset] = codepage;
 				}
 			}
 
@@ -526,6 +532,7 @@ namespace MimeKit.Utils {
 				try {
 					encoding = CharsetUtils.GetEncoding (codepage);
 				} catch (NotSupportedException) {
+				} catch (ArgumentException) {
 				}
 			}
 

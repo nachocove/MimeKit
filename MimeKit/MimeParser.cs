@@ -110,7 +110,7 @@ namespace MimeKit {
 	/// </remarks>
 	public class MimeParser : IEnumerable<MimeMessage>
 	{
-		static readonly StringComparer icase = StringComparer.OrdinalIgnoreCase;
+		static readonly byte[] UTF8ByteOrderMark = { 0xEF, 0xBB, 0xBF };
 		const int ReadAheadSize = 128;
 		const int BlockSize = 4096;
 		const int PadSize = 4;
@@ -163,22 +163,7 @@ namespace MimeKit {
 		/// <exception cref="System.ArgumentNullException">
 		/// <paramref name="stream"/> is <c>null</c>.
 		/// </exception>
-		public MimeParser (Stream stream, MimeFormat format, bool persistent) : this (ParserOptions.Default, stream, format, persistent)
-		{
-		}
-
-		/// <summary>
-		/// Initializes a new instance of the <see cref="MimeKit.MimeParser"/> class.
-		/// </summary>
-		/// <remarks>
-		/// <para>Creates a new <see cref="MimeParser"/> that will parse the specified stream.</para>
-		/// </remarks>
-		/// <param name="stream">The stream to parse.</param>
-		/// <param name="format">The format of the stream.</param>
-		/// <exception cref="System.ArgumentNullException">
-		/// <paramref name="stream"/> is <c>null</c>.
-		/// </exception>
-		public MimeParser (Stream stream, MimeFormat format) : this (ParserOptions.Default, stream, format, false)
+		public MimeParser (Stream stream, MimeFormat format, bool persistent = false) : this (ParserOptions.Default, stream, format, persistent)
 		{
 		}
 
@@ -200,21 +185,7 @@ namespace MimeKit {
 		/// <exception cref="System.ArgumentNullException">
 		/// <paramref name="stream"/> is <c>null</c>.
 		/// </exception>
-		public MimeParser (Stream stream, bool persistent) : this (ParserOptions.Default, stream, MimeFormat.Default, persistent)
-		{
-		}
-
-		/// <summary>
-		/// Initializes a new instance of the <see cref="MimeKit.MimeParser"/> class.
-		/// </summary>
-		/// <remarks>
-		/// <para>Creates a new <see cref="MimeParser"/> that will parse the specified stream.</para>
-		/// </remarks>
-		/// <param name="stream">The stream to parse.</param>
-		/// <exception cref="System.ArgumentNullException">
-		/// <paramref name="stream"/> is <c>null</c>.
-		/// </exception>
-		public MimeParser (Stream stream) : this (ParserOptions.Default, stream, MimeFormat.Default, false)
+		public MimeParser (Stream stream, bool persistent = false) : this (ParserOptions.Default, stream, MimeFormat.Default, persistent)
 		{
 		}
 
@@ -239,24 +210,7 @@ namespace MimeKit {
 		/// <para>-or-</para>
 		/// <para><paramref name="stream"/> is <c>null</c>.</para>
 		/// </exception>
-		public MimeParser (ParserOptions options, Stream stream, bool persistent) : this (options, stream, MimeFormat.Default, persistent)
-		{
-		}
-
-		/// <summary>
-		/// Initializes a new instance of the <see cref="MimeKit.MimeParser"/> class.
-		/// </summary>
-		/// <remarks>
-		/// <para>Creates a new <see cref="MimeParser"/> that will parse the specified stream.</para>
-		/// </remarks>
-		/// <param name="options">The parser options.</param>
-		/// <param name="stream">The stream to parse.</param>
-		/// <exception cref="System.ArgumentNullException">
-		/// <para><paramref name="options"/> is <c>null</c>.</para>
-		/// <para>-or-</para>
-		/// <para><paramref name="stream"/> is <c>null</c>.</para>
-		/// </exception>
-		public MimeParser (ParserOptions options, Stream stream) : this (options, stream, MimeFormat.Default, false)
+		public MimeParser (ParserOptions options, Stream stream, bool persistent = false) : this (options, stream, MimeFormat.Default, persistent)
 		{
 		}
 
@@ -282,30 +236,12 @@ namespace MimeKit {
 		/// <para>-or-</para>
 		/// <para><paramref name="stream"/> is <c>null</c>.</para>
 		/// </exception>
-		public MimeParser (ParserOptions options, Stream stream, MimeFormat format, bool persistent)
+		public MimeParser (ParserOptions options, Stream stream, MimeFormat format, bool persistent = false)
 		{
 			bounds = new List<Boundary> ();
 			headers = new List<Header> ();
 
 			SetStream (options, stream, format, persistent);
-		}
-
-		/// <summary>
-		/// Initializes a new instance of the <see cref="MimeKit.MimeParser"/> class.
-		/// </summary>
-		/// <remarks>
-		/// <para>Creates a new <see cref="MimeParser"/> that will parse the specified stream.</para>
-		/// </remarks>
-		/// <param name="options">The parser options.</param>
-		/// <param name="stream">The stream to parse.</param>
-		/// <param name="format">The format of the stream.</param>
-		/// <exception cref="System.ArgumentNullException">
-		/// <para><paramref name="options"/> is <c>null</c>.</para>
-		/// <para>-or-</para>
-		/// <para><paramref name="stream"/> is <c>null</c>.</para>
-		/// </exception>
-		public MimeParser (ParserOptions options, Stream stream, MimeFormat format) : this (options, stream, format, false)
-		{
 		}
 
 		/// <summary>
@@ -375,7 +311,7 @@ namespace MimeKit {
 		/// <para>-or-</para>
 		/// <para><paramref name="stream"/> is <c>null</c>.</para>
 		/// </exception>
-		public void SetStream (ParserOptions options, Stream stream, MimeFormat format, bool persistent)
+		public void SetStream (ParserOptions options, Stream stream, MimeFormat format, bool persistent = false)
 		{
 			if (options == null)
 				throw new ArgumentNullException ("options");
@@ -403,30 +339,12 @@ namespace MimeKit {
 			bounds.Clear ();
 			if (format == MimeFormat.Mbox) {
 				bounds.Add (Boundary.CreateMboxBoundary ());
-				mboxMarkerBuffer = new byte[ReadAheadSize];
-				state = MimeParserState.MboxMarker;
-			} else {
-				state = MimeParserState.Initialized;
-			}
-		}
 
-		/// <summary>
-		/// Sets the stream to parse.
-		/// </summary>
-		/// <remarks>
-		/// <para>Sets the stream to parse.</para>
-		/// </remarks>
-		/// <param name="options">The parser options.</param>
-		/// <param name="stream">The stream to parse.</param>
-		/// <param name="format">The format of the stream.</param>
-		/// <exception cref="System.ArgumentNullException">
-		/// <para><paramref name="options"/> is <c>null</c>.</para>
-		/// <para>-or-</para>
-		/// <para><paramref name="stream"/> is <c>null</c>.</para>
-		/// </exception>
-		public void SetStream (ParserOptions options, Stream stream, MimeFormat format)
-		{
-			SetStream (options, stream, format, false);
+				if (mboxMarkerBuffer == null)
+					mboxMarkerBuffer = new byte[ReadAheadSize];
+			}
+
+			state = MimeParserState.Initialized;
 		}
 
 		/// <summary>
@@ -450,7 +368,7 @@ namespace MimeKit {
 		/// <para>-or-</para>
 		/// <para><paramref name="stream"/> is <c>null</c>.</para>
 		/// </exception>
-		public void SetStream (ParserOptions options, Stream stream, bool persistent)
+		public void SetStream (ParserOptions options, Stream stream, bool persistent = false)
 		{
 			SetStream (options, stream, MimeFormat.Default, persistent);
 		}
@@ -460,24 +378,6 @@ namespace MimeKit {
 		/// </summary>
 		/// <remarks>
 		/// <para>Sets the stream to parse.</para>
-		/// </remarks>
-		/// <param name="options">The parser options.</param>
-		/// <param name="stream">The stream to parse.</param>
-		/// <exception cref="System.ArgumentNullException">
-		/// <para><paramref name="options"/> is <c>null</c>.</para>
-		/// <para>-or-</para>
-		/// <para><paramref name="stream"/> is <c>null</c>.</para>
-		/// </exception>
-		public void SetStream (ParserOptions options, Stream stream)
-		{
-			SetStream (options, stream, MimeFormat.Default, false);
-		}
-
-		/// <summary>
-		/// Sets the stream to parse.
-		/// </summary>
-		/// <remarks>
-		/// <para>Sets the stream to parse.</para>
 		/// <para>If <paramref name="persistent"/> is <c>true</c> and <paramref name="stream"/> is seekable, then
 		/// the <see cref="MimeParser"/> will not copy the content of <see cref="MimePart"/>s into memory. Instead,
 		/// it will use a <see cref="MimeKit.IO.BoundStream"/> to reference a substream of <paramref name="stream"/>.
@@ -492,7 +392,7 @@ namespace MimeKit {
 		/// <exception cref="System.ArgumentNullException">
 		/// <paramref name="stream"/> is <c>null</c>.
 		/// </exception>
-		public void SetStream (Stream stream, MimeFormat format, bool persistent)
+		public void SetStream (Stream stream, MimeFormat format, bool persistent = false)
 		{
 			SetStream (ParserOptions.Default, stream, format, persistent);
 		}
@@ -502,22 +402,6 @@ namespace MimeKit {
 		/// </summary>
 		/// <remarks>
 		/// <para>Sets the stream to parse.</para>
-		/// </remarks>
-		/// <param name="stream">The stream to parse.</param>
-		/// <param name="format">The format of the stream.</param>
-		/// <exception cref="System.ArgumentNullException">
-		/// <paramref name="stream"/> is <c>null</c>.
-		/// </exception>
-		public void SetStream (Stream stream, MimeFormat format)
-		{
-			SetStream (ParserOptions.Default, stream, format, false);
-		}
-
-		/// <summary>
-		/// Sets the stream to parse.
-		/// </summary>
-		/// <remarks>
-		/// <para>Sets the stream to parse.</para>
 		/// <para>If <paramref name="persistent"/> is <c>true</c> and <paramref name="stream"/> is seekable, then
 		/// the <see cref="MimeParser"/> will not copy the content of <see cref="MimePart"/>s into memory. Instead,
 		/// it will use a <see cref="MimeKit.IO.BoundStream"/> to reference a substream of <paramref name="stream"/>.
@@ -531,24 +415,9 @@ namespace MimeKit {
 		/// <exception cref="System.ArgumentNullException">
 		/// <paramref name="stream"/> is <c>null</c>.
 		/// </exception>
-		public void SetStream (Stream stream, bool persistent)
+		public void SetStream (Stream stream, bool persistent = false)
 		{
 			SetStream (ParserOptions.Default, stream, MimeFormat.Default, persistent);
-		}
-
-		/// <summary>
-		/// Sets the stream to parse.
-		/// </summary>
-		/// <remarks>
-		/// <para>Sets the stream to parse.</para>
-		/// </remarks>
-		/// <param name="stream">The stream to parse.</param>
-		/// <exception cref="System.ArgumentNullException">
-		/// <paramref name="stream"/> is <c>null</c>.
-		/// </exception>
-		public void SetStream (Stream stream)
-		{
-			SetStream (ParserOptions.Default, stream, MimeFormat.Default, false);
 		}
 
 #if DEBUG
@@ -796,6 +665,8 @@ namespace MimeKit {
 
 		unsafe bool StepByteOrderMark (byte* inbuf)
 		{
+			int bomIndex = 0;
+
 			do {
 				if (ReadAhead (ReadAheadSize, 0) <= 0) {
 					// failed to read any data... EOF
@@ -806,8 +677,10 @@ namespace MimeKit {
 				byte* inptr = inbuf + inputIndex;
 				byte* inend = inbuf + inputEnd;
 
-				while (inptr < inend && IsControl (*inptr))
+				while (inptr < inend && bomIndex < UTF8ByteOrderMark.Length && *inptr == UTF8ByteOrderMark[bomIndex]) {
+					bomIndex++;
 					inptr++;
+				}
 
 				inputIndex = (int) (inptr - inbuf);
 			} while (inputIndex == inputEnd);
@@ -1041,7 +914,7 @@ namespace MimeKit {
 			ContentType type;
 
 			for (int i = 0; i < headers.Count; i++) {
-				if (icase.Compare (headers[i].Field, "Content-Type") != 0)
+				if (!headers[i].Field.Equals ("Content-Type", StringComparison.OrdinalIgnoreCase))
 					continue;
 
 				if (!ContentType.TryParse (options, headers[i].RawValue, out type) && type == null)
@@ -1439,7 +1312,7 @@ namespace MimeKit {
 					throw new FormatException ("Failed to parse headers.");
 			}
 
-			state = MimeParserState.Complete;
+			state = eos ? MimeParserState.Eos : MimeParserState.Complete;
 
 			var parsed = new HeaderList (options);
 			foreach (var header in headers)
@@ -1559,7 +1432,7 @@ namespace MimeKit {
 				bounds[0].ContentEnd = -1;
 
 				for (int i = 0; i < headers.Count; i++) {
-					if (icase.Compare (headers[i].Field, "Content-Length") != 0)
+					if (!headers[i].Field.Equals ("Content-Length", StringComparison.OrdinalIgnoreCase))
 						continue;
 
 					var value = headers[i].RawValue;

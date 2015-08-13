@@ -19,7 +19,7 @@
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\lib\Xamarin.iOS</OutputPath>
     <IntermediateOutputPath>obj\Debug\lib\Xamarin.iOS</IntermediateOutputPath>
-    <DefineConstants>DEBUG;ENABLE_CRYPTO;ENABLE_SNM;__MOBILE__;__IOS__</DefineConstants>
+    <DefineConstants>DEBUG;SERIALIZABLE;ENABLE_CRYPTO;ENABLE_SNM;__MOBILE__;__IOS__</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <ConsolePause>false</ConsolePause>
@@ -33,7 +33,7 @@
     <WarningLevel>4</WarningLevel>
     <ConsolePause>false</ConsolePause>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <DefineConstants>ENABLE_CRYPTO;ENABLE_SNM;__MOBILE__;__IOS__</DefineConstants>
+    <DefineConstants>SERIALIZABLE;ENABLE_CRYPTO;ENABLE_SNM;__MOBILE__;__IOS__</DefineConstants>
     <GenerateDocumentation>True</GenerateDocumentation>
     <DocumentationFile>bin\Release\lib\Xamarin.iOS\MimeKit.xml</DocumentationFile>
   </PropertyGroup>
@@ -52,7 +52,7 @@
     <Reference Include="Xamarin.iOS" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\bc-csharp\crypto\BouncyCastle.iOS.csproj">
+    <ProjectReference Include="..\submodules\bc-csharp\crypto\BouncyCastle.iOS.csproj">
       <Project>{0249241C-205E-4AC0-828B-90F822359B9E}</Project>
       <Name>BouncyCastle.iOS</Name>
     </ProjectReference>
@@ -150,7 +150,7 @@
     <Compile Include="Text\HtmlAttributeId.cs" />
     <Compile Include="Text\HtmlEntityDecoder.cs" />
     <Compile Include="Text\HtmlEntityDecoder.g.cs">
-      <DependentUpon>Text\HtmlEntityDecoder.cs</DependentUpon>
+      <DependentUpon>HtmlEntityDecoder.cs</DependentUpon>
     </Compile>
     <Compile Include="Text\HtmlNamespace.cs" />
     <Compile Include="Text\HtmlTagCallback.cs" />
@@ -213,14 +213,18 @@
     <Compile Include="HeaderId.cs" />
     <Compile Include="HeaderList.cs" />
     <Compile Include="HeaderListChangedEventArgs.cs" />
+    <Compile Include="HeaderListCollection.cs" />
     <Compile Include="IContentObject.cs" />
     <Compile Include="InternetAddress.cs" />
     <Compile Include="InternetAddressList.cs" />
     <Compile Include="MailboxAddress.cs" />
+    <Compile Include="MessageDeliveryStatus.cs" />
     <Compile Include="MessageDispositionNotification.cs" />
     <Compile Include="MessageIdList.cs" />
+    <Compile Include="MessageImportance.cs" />
     <Compile Include="MessagePart.cs" />
     <Compile Include="MessagePartial.cs" />
+    <Compile Include="MessagePriority.cs" />
     <Compile Include="MimeEntity.cs" />
     <Compile Include="MimeEntityConstructorArgs.cs" />
     <Compile Include="MimeFormat.cs" />

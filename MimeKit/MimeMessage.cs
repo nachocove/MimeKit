@@ -62,15 +62,16 @@ namespace MimeKit {
 	/// tree of MIME entities such as a text/plain MIME part and a collection
 	/// of file attachments.</para>
 	/// </remarks>
-	public class MimeMessage
+	public class MimeMessage : IDisposable
 	{
-		static readonly StringComparer icase = StringComparer.OrdinalIgnoreCase;
 		static readonly string[] StandardAddressHeaders = {
 			"Resent-From", "Resent-Reply-To", "Resent-To", "Resent-Cc", "Resent-Bcc",
 			"From", "Reply-To", "To", "Cc", "Bcc"
 		};
 
 		readonly Dictionary<string, InternetAddressList> addresses;
+		MessageImportance importance = MessageImportance.Normal;
+		MessagePriority priority = MessagePriority.Normal;
 		readonly MessageIdList references;
 		MailboxAddress resentSender;
 		DateTimeOffset resentDate;
@@ -80,10 +81,11 @@ namespace MimeKit {
 		string messageId;
 		string inreplyto;
 		Version version;
+		bool disposed;
 
 		internal MimeMessage (ParserOptions options, IEnumerable<Header> headers)
 		{
-			addresses = new Dictionary<string, InternetAddressList> (icase);
+			addresses = new Dictionary<string, InternetAddressList> (StringComparer.OrdinalIgnoreCase);
 			Headers = new HeaderList (options);
 
 			// initialize our address lists
@@ -110,7 +112,7 @@ namespace MimeKit {
 
 		internal MimeMessage (ParserOptions options)
 		{
-			addresses = new Dictionary<string, InternetAddressList> (icase);
+			addresses = new Dictionary<string, InternetAddressList> (StringComparer.OrdinalIgnoreCase);
 			Headers = new HeaderList (options);
 
 			// initialize our address lists
@@ -238,6 +240,19 @@ namespace MimeKit {
 		}
 
 		/// <summary>
+		/// Releases unmanaged resources and performs other cleanup operations before the
+		/// <see cref="MimeKit.MimeMessage"/> is reclaimed by garbage collection.
+		/// </summary>
+		/// <remarks>
+		/// Releases unmanaged resources and performs other cleanup operations before the
+		/// <see cref="MimeKit.MimeMessage"/> is reclaimed by garbage collection.
+		/// </remarks>
+		~MimeMessage ()
+		{
+			Dispose (false);
+		}
+
+		/// <summary>
 		/// Gets the list of headers.
 		/// </summary>
 		/// <remarks>
@@ -249,6 +264,73 @@ namespace MimeKit {
 		/// <value>The list of headers.</value>
 		public HeaderList Headers {
 			get; private set;
+		}
+
+		/// <summary>
+		/// Get or set the value of the Importance header.
+		/// </summary>
+		/// <remarks>
+		/// Gets or sets the value of the Importance header.
+		/// </remarks>
+		/// <value>The importance.</value>
+		/// <exception cref="System.ArgumentOutOfRangeException">
+		/// <paramref name="value"/> is not a valid <see cref="MessageImportance"/>.
+		/// </exception>
+		public MessageImportance Importance {
+			get { return importance; }
+			set {
+				if (value == importance)
+					return;
+
+				switch (value) {
+				case MessageImportance.Normal:
+				case MessageImportance.High:
+				case MessageImportance.Low:
+					SetHeader ("Importance", value.ToString ().ToLowerInvariant ());
+					importance = value;
+					break;
+				default:
+					throw new ArgumentOutOfRangeException ("value");
+				}
+			}
+		}
+
+		/// <summary>
+		/// Get or set the value of the Priority header.
+		/// </summary>
+		/// <remarks>
+		/// Gets or sets the value of the Priority header.
+		/// </remarks>
+		/// <value>The priority.</value>
+		/// <exception cref="System.ArgumentOutOfRangeException">
+		/// <paramref name="value"/> is not a valid <see cref="MessagePriority"/>.
+		/// </exception>
+		public MessagePriority Priority {
+			get { return priority; }
+			set {
+				if (value == priority)
+					return;
+
+				string rawValue;
+
+				switch (value) {
+				case MessagePriority.NonUrgent:
+					rawValue = "non-urgent";
+					break;
+				case MessagePriority.Normal:
+					rawValue = "normal";
+					break;
+				case MessagePriority.Urgent:
+					rawValue = "urgent";
+					break;
+				default:
+					throw new ArgumentOutOfRangeException ("value");
+				}
+
+				SetHeader ("Priority", rawValue);
+
+				priority = value;
+			}
 		}
 
 		/// <summary>
@@ -272,7 +354,7 @@ namespace MimeKit {
 				}
 
 				var options = FormatOptions.Default;
-				var builder = new StringBuilder ();
+				var builder = new StringBuilder (" ");
 				int len = "Sender: ".Length;
 
 				value.Encode (options, builder, ref len);
@@ -307,7 +389,7 @@ namespace MimeKit {
 				}
 
 				var options = FormatOptions.Default;
-				var builder = new StringBuilder ();
+				var builder = new StringBuilder (" ");
 				int len = "Resent-Sender: ".Length;
 
 				value.Encode (options, builder, ref len);
@@ -796,7 +878,7 @@ namespace MimeKit {
 			return null;
 		}
 
-		static IEnumerable<MimePart> EnumerateMimeParts (MimeEntity entity)
+		static IEnumerable<MimeEntity> EnumerateMimeParts (MimeEntity entity)
 		{
 			if (entity == null)
 				yield break;
@@ -812,30 +894,18 @@ namespace MimeKit {
 				yield break;
 			}
 
-			var msgpart = entity as MessagePart;
-
-			if (msgpart != null) {
-				var message = msgpart.Message;
-
-				if (message != null) {
-					foreach (var part in EnumerateMimeParts (message.Body))
-						yield return part;
-				}
-
-				yield break;
-			}
-
-			yield return (MimePart) entity;
+			yield return entity;
 		}
 
 		/// <summary>
 		/// Gets the body parts of the message.
 		/// </summary>
 		/// <remarks>
-		/// Traverses over the MIME tree, enumerating all of the <see cref="MimePart"/> objects.
+		/// Traverses over the MIME tree, enumerating all of the <see cref="MimeEntity"/> objects,
+		/// but does not traverse into the bodies of attached messages.
 		/// </remarks>
 		/// <value>The body parts.</value>
-		public IEnumerable<MimePart> BodyParts {
+		public IEnumerable<MimeEntity> BodyParts {
 			get { return EnumerateMimeParts (Body); }
 		}
 
@@ -843,12 +913,12 @@ namespace MimeKit {
 		/// Gets the attachments.
 		/// </summary>
 		/// <remarks>
-		/// Traverses over the MIME tree, enumerating all of the <see cref="MimePart"/> objects that
+		/// Traverses over the MIME tree, enumerating all of the <see cref="MimeEntity"/> objects that
 		/// have a Content-Disposition header set to <c>"attachment"</c>.
 		/// </remarks>
 		/// <value>The attachments.</value>
-		public IEnumerable<MimePart> Attachments {
-			get { return EnumerateMimeParts (Body).Where (part => part.IsAttachment); }
+		public IEnumerable<MimeEntity> Attachments {
+			get { return EnumerateMimeParts (Body).Where (x => x.IsAttachment); }
 		}
 
 		/// <summary>
@@ -865,7 +935,7 @@ namespace MimeKit {
 			using (var memory = new MemoryStream ()) {
 				WriteTo (FormatOptions.Default, memory);
 
-#if !PORTABLE
+#if !PORTABLE && !COREFX
 				var buffer = memory.GetBuffer ();
 #else
 				var buffer = memory.ToArray ();
@@ -1010,7 +1080,7 @@ namespace MimeKit {
 			WriteTo (FormatOptions.Default, stream, cancellationToken);
 		}
 
-		#if !PORTABLE
+#if !PORTABLE && !COREFX
 		/// <summary>
 		/// Writes the message to the specified file.
 		/// </summary>
@@ -1053,7 +1123,7 @@ namespace MimeKit {
 			if (fileName == null)
 				throw new ArgumentNullException ("fileName");
 
-			using (var stream = File.OpenWrite (fileName))
+			using (var stream = File.Open (fileName, FileMode.Create, FileAccess.Write))
 				WriteTo (options, stream, cancellationToken);
 		}
 
@@ -1093,10 +1163,10 @@ namespace MimeKit {
 			if (fileName == null)
 				throw new ArgumentNullException ("fileName");
 
-			using (var stream = File.OpenWrite (fileName))
+			using (var stream = File.Open (fileName, FileMode.Create, FileAccess.Write))
 				WriteTo (FormatOptions.Default, stream, cancellationToken);
 		}
-		#endif
+#endif
 
 		MailboxAddress GetMessageSigner ()
 		{
@@ -1117,39 +1187,49 @@ namespace MimeKit {
 
 		IList<MailboxAddress> GetMessageRecipients (bool includeSenders)
 		{
-			var recipients = new List<MailboxAddress> ();
+			var recipients = new HashSet<MailboxAddress> ();
 
 			if (ResentSender != null || ResentFrom.Count > 0) {
 				if (includeSenders) {
 					if (ResentSender != null)
 						recipients.Add (ResentSender);
 
-					if (ResentFrom.Count > 0)
-						recipients.AddRange (ResentFrom.Mailboxes);
+					if (ResentFrom.Count > 0) {
+						foreach (var mailbox in ResentFrom.Mailboxes)
+							recipients.Add (mailbox);
+					}
 				}
 
-				recipients.AddRange (ResentTo.Mailboxes);
-				recipients.AddRange (ResentCc.Mailboxes);
-				recipients.AddRange (ResentBcc.Mailboxes);
+				foreach (var mailbox in ResentTo.Mailboxes)
+					recipients.Add (mailbox);
+				foreach (var mailbox in ResentCc.Mailboxes)
+					recipients.Add (mailbox);
+				foreach (var mailbox in ResentBcc.Mailboxes)
+					recipients.Add (mailbox);
 			} else {
 				if (includeSenders) {
 					if (Sender != null)
 						recipients.Add (Sender);
 
-					if (From.Count > 0)
-						recipients.AddRange (From.Mailboxes);
+					if (From.Count > 0) {
+						foreach (var mailbox in From.Mailboxes)
+							recipients.Add (mailbox);
+					}
 				}
 
-				recipients.AddRange (To.Mailboxes);
-				recipients.AddRange (Cc.Mailboxes);
-				recipients.AddRange (Bcc.Mailboxes);
+				foreach (var mailbox in To.Mailboxes)
+					recipients.Add (mailbox);
+				foreach (var mailbox in Cc.Mailboxes)
+					recipients.Add (mailbox);
+				foreach (var mailbox in Bcc.Mailboxes)
+					recipients.Add (mailbox);
 			}
 
-			return recipients;
+			return recipients.ToList ();
 		}
 
 #if ENABLE_CRYPTO
-		static void DkimWriteHeaderRelaxed (FormatOptions options, Stream stream, Header header)
+		static void DkimWriteHeaderRelaxed (FormatOptions options, Stream stream, Header header, bool isDkimSignature)
 		{
 			var name = Encoding.ASCII.GetBytes (header.Field.ToLowerInvariant ());
 			var rawValue = header.GetRawValue (options);
@@ -1203,16 +1283,27 @@ namespace MimeKit {
 				index = nextLine;
 			}
 
-			stream.Write (options.NewLineBytes, 0, options.NewLineBytes.Length);
+			if (!isDkimSignature)
+				stream.Write (options.NewLineBytes, 0, options.NewLineBytes.Length);
 		}
 
-		static void DkimWriteHeaderSimple (FormatOptions options, Stream stream, Header header)
+		static void DkimWriteHeaderSimple (FormatOptions options, Stream stream, Header header, bool isDkimSignature)
 		{
 			var rawValue = header.GetRawValue (options);
+			int rawLength = rawValue.Length;
+
+			if (isDkimSignature && rawLength > 0) {
+				if (rawValue[rawLength - 1] == (byte) '\n') {
+					rawLength--;
+
+					if (rawLength > 0 && rawValue[rawLength - 1] == (byte) '\r')
+						rawLength--;
+				}
+			}
 
 			stream.Write (header.RawField, 0, header.RawField.Length);
 			stream.Write (new [] { (byte) ':' }, 0, 1);
-			stream.Write (rawValue, 0, rawValue.Length);
+			stream.Write (rawValue, 0, rawLength);
 		}
 
 		static ISigner DkimGetDigestSigner (DkimSignatureAlgorithm algorithm, AsymmetricKeyParameter key)
@@ -1261,9 +1352,9 @@ namespace MimeKit {
 		void DkimWriteHeaders (FormatOptions options, IList<string> fields, DkimCanonicalizationAlgorithm headerCanonicalizationAlgorithm, Stream stream)
 		{
 			var counts = new Dictionary<string, int> ();
-			Header header;
 
 			for (int i = 0; i < fields.Count; i++) {
+				var headers = fields[i].StartsWith ("Content-", StringComparison.OrdinalIgnoreCase) ? Body.Headers : Headers;
 				var name = fields[i].ToLowerInvariant ();
 				int index, count, n = 0;
 
@@ -1276,25 +1367,25 @@ namespace MimeKit {
 				// multiple instances of such a header field MUST include the header field
 				// name multiple times in the list of header fields and MUST sign such header
 				// fields in order from the bottom of the header field block to the top.
-				index = Headers.LastIndexOf (name);
+				index = headers.LastIndexOf (name);
 
 				// find the n'th header with this name
 				while (n < count && --index >= 0) {
-					if (Headers[index].Field.Equals (name, StringComparison.OrdinalIgnoreCase))
+					if (headers[index].Field.Equals (name, StringComparison.OrdinalIgnoreCase))
 						n++;
 				}
 
 				if (index < 0)
 					continue;
 
-				header = Headers[index];
+				var header = headers[index];
 
 				switch (headerCanonicalizationAlgorithm) {
 				case DkimCanonicalizationAlgorithm.Relaxed:
-					DkimWriteHeaderRelaxed (options, stream, header);
+					DkimWriteHeaderRelaxed (options, stream, header, false);
 					break;
 				default:
-					DkimWriteHeaderSimple (options, stream, header);
+					DkimWriteHeaderSimple (options, stream, header, false);
 					break;
 				}
 
@@ -1400,10 +1491,10 @@ namespace MimeKit {
 
 					switch (headerCanonicalizationAlgorithm) {
 					case DkimCanonicalizationAlgorithm.Relaxed:
-						DkimWriteHeaderRelaxed (options, filtered, dkim);
+						DkimWriteHeaderRelaxed (options, filtered, dkim, true);
 						break;
 					default:
-						DkimWriteHeaderSimple (options, filtered, dkim);
+						DkimWriteHeaderSimple (options, filtered, dkim, true);
 						break;
 					}
 
@@ -1660,10 +1751,10 @@ namespace MimeKit {
 
 					switch (headerAlgorithm) {
 					case DkimCanonicalizationAlgorithm.Relaxed:
-						DkimWriteHeaderRelaxed (options, filtered, header);
+						DkimWriteHeaderRelaxed (options, filtered, header, true);
 						break;
 					default:
-						DkimWriteHeaderSimple (options, filtered, header);
+						DkimWriteHeaderSimple (options, filtered, header, true);
 						break;
 					}
 
@@ -2127,6 +2218,12 @@ namespace MimeKit {
 			case HeaderId.Sender:
 				sender = null;
 				break;
+			case HeaderId.Importance:
+				importance = MessageImportance.Normal;
+				break;
+			case HeaderId.Priority:
+				priority = MessagePriority.Normal;
+				break;
 			case HeaderId.Date:
 				date = DateTimeOffset.MinValue;
 				break;
@@ -2155,12 +2252,12 @@ namespace MimeKit {
 					inreplyto = MimeUtils.EnumerateReferences (rawValue, 0, rawValue.Length).FirstOrDefault ();
 					break;
 				case HeaderId.ResentMessageId:
-					resentMessageId = MimeUtils.EnumerateReferences (rawValue, 0, rawValue.Length).FirstOrDefault ();
+					resentMessageId = MimeUtils.ParseMessageId (rawValue, 0, rawValue.Length);
 					if (resentMessageId != null)
 						return;
 					break;
 				case HeaderId.MessageId:
-					messageId = MimeUtils.EnumerateReferences (rawValue, 0, rawValue.Length).FirstOrDefault ();
+					messageId = MimeUtils.ParseMessageId (rawValue, 0, rawValue.Length);
 					if (messageId != null)
 						return;
 					break;
@@ -2179,6 +2276,20 @@ namespace MimeKit {
 				case HeaderId.ResentDate:
 					if (DateUtils.TryParse (rawValue, 0, rawValue.Length, out resentDate))
 						return;
+					break;
+				case HeaderId.Importance:
+					switch (header.Value.ToLowerInvariant ().Trim ()) {
+					case "high": importance = MessageImportance.High; break;
+					case "low": importance = MessageImportance.Low; break;
+					default: importance = MessageImportance.Normal; break;
+					}
+					break;
+				case HeaderId.Priority:
+					switch (header.Value.ToLowerInvariant ().Trim ()) {
+					case "non-urgent": priority = MessagePriority.NonUrgent; break;
+					case "urgent": priority = MessagePriority.Urgent; break;
+					default: priority = MessagePriority.Normal; break;
+					}
 					break;
 				case HeaderId.Date:
 					if (DateUtils.TryParse (rawValue, 0, rawValue.Length, out date))
@@ -2218,10 +2329,10 @@ namespace MimeKit {
 					inreplyto = MimeUtils.EnumerateReferences (rawValue, 0, rawValue.Length).FirstOrDefault ();
 					break;
 				case HeaderId.ResentMessageId:
-					resentMessageId = MimeUtils.EnumerateReferences (rawValue, 0, rawValue.Length).FirstOrDefault ();
+					resentMessageId = MimeUtils.ParseMessageId (rawValue, 0, rawValue.Length);
 					break;
 				case HeaderId.MessageId:
-					messageId = MimeUtils.EnumerateReferences (rawValue, 0, rawValue.Length).FirstOrDefault ();
+					messageId = MimeUtils.ParseMessageId (rawValue, 0, rawValue.Length);
 					break;
 				case HeaderId.ResentSender:
 					if (InternetAddress.TryParse (Headers.Options, rawValue, ref index, rawValue.Length, false, out address))
@@ -2233,6 +2344,20 @@ namespace MimeKit {
 					break;
 				case HeaderId.ResentDate:
 					DateUtils.TryParse (rawValue, 0, rawValue.Length, out resentDate);
+					break;
+				case HeaderId.Importance:
+					switch (e.Header.Value.ToLowerInvariant ().Trim ()) {
+					case "high": importance = MessageImportance.High; break;
+					case "low": importance = MessageImportance.Low; break;
+					default: importance = MessageImportance.Normal; break;
+					}
+					break;
+				case HeaderId.Priority:
+					switch (e.Header.Value.ToLowerInvariant ().Trim ()) {
+					case "non-urgent": priority = MessagePriority.NonUrgent; break;
+					case "urgent": priority = MessagePriority.Urgent; break;
+					default: priority = MessagePriority.Normal; break;
+					}
 					break;
 				case HeaderId.Date:
 					DateUtils.TryParse (rawValue, 0, rawValue.Length, out date);
@@ -2259,6 +2384,8 @@ namespace MimeKit {
 				references.Clear ();
 				references.Changed += ReferencesChanged;
 
+				importance = MessageImportance.Normal;
+				priority = MessagePriority.Normal;
 				resentMessageId = null;
 				resentSender = null;
 				inreplyto = null;
@@ -2269,6 +2396,36 @@ namespace MimeKit {
 			default:
 				throw new ArgumentOutOfRangeException ();
 			}
+		}
+
+		/// <summary>
+		/// Releases the unmanaged resources used by the <see cref="MimeMessage"/> and
+		/// optionally releases the managed resources.
+		/// </summary>
+		/// <remarks>
+		/// Releases the unmanaged resources used by the <see cref="MimeMessage"/> and
+		/// optionally releases the managed resources.
+		/// </remarks>
+		/// <param name="disposing"><c>true</c> to release both managed and unmanaged resources;
+		/// <c>false</c> to release only the unmanaged resources.</param>
+		protected virtual void Dispose (bool disposing)
+		{
+			if (disposing && !disposed && Body != null)
+				Body.Dispose ();
+		}
+
+		/// <summary>
+		/// Releases all resources used by the <see cref="MimeKit.MimeMessage"/> object.
+		/// </summary>
+		/// <remarks>Call <see cref="Dispose()"/> when you are finished using the <see cref="MimeKit.MimeMessage"/>. The
+		/// <see cref="Dispose()"/> method leaves the <see cref="MimeKit.MimeMessage"/> in an unusable state. After
+		/// calling <see cref="Dispose()"/>, you must release all references to the <see cref="MimeKit.MimeMessage"/> so
+		/// the garbage collector can reclaim the memory that the <see cref="MimeKit.MimeMessage"/> was occupying.</remarks>
+		public void Dispose ()
+		{
+			Dispose (true);
+			GC.SuppressFinalize (this);
+			disposed = true;
 		}
 
 		/// <summary>
@@ -2405,7 +2562,7 @@ namespace MimeKit {
 			return Load (ParserOptions.Default, stream, false, cancellationToken);
 		}
 
-#if !PORTABLE
+#if !PORTABLE && !COREFX
 		/// <summary>
 		/// Load a <see cref="MimeMessage"/> from the specified file.
 		/// </summary>
@@ -2453,9 +2610,8 @@ namespace MimeKit {
 			if (fileName == null)
 				throw new ArgumentNullException ("fileName");
 
-			using (var stream = File.OpenRead (fileName)) {
+			using (var stream = File.Open (fileName, FileMode.Open, FileAccess.Read))
 				return Load (options, stream, cancellationToken);
-			}
 		}
 
 		/// <summary>
@@ -2501,8 +2657,6 @@ namespace MimeKit {
 #endif // !PORTABLE
 
 #if ENABLE_SNM
-		#region System.Net.Mail support
-
 		static MimePart GetMimePart (AttachmentBase item)
 		{
 			var mimeType = item.ContentType.ToString ();
@@ -2679,8 +2833,6 @@ namespace MimeKit {
 		{
 			return message != null ? CreateFromMailMessage (message) : null;
 		}
-
-		#endregion
 #endif
 	}
 }

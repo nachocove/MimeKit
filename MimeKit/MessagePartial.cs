@@ -96,6 +96,12 @@ namespace MimeKit {
 			ContentType.Parameters.Add (new Parameter ("total", total.ToString ()));
 		}
 
+		void CheckDisposed ()
+		{
+			if (IsDisposed)
+				throw new ObjectDisposedException ("MessagePartial");
+		}
+
 		/// <summary>
 		/// Gets the "id" parameter of the Content-Type header.
 		/// </summary>
@@ -165,6 +171,8 @@ namespace MimeKit {
 			if (visitor == null)
 				throw new ArgumentNullException ("visitor");
 
+			CheckDisposed ();
+
 			visitor.VisitMessagePartial (this);
 		}
 
@@ -213,10 +221,10 @@ namespace MimeKit {
 				}
 
 				var streams = new List<Stream> ();
-#if PORTABLE
-				var buf = memory.ToArray ();
-#else
+#if !PORTABLE && !COREFX
 				var buf = memory.GetBuffer ();
+#else
+				var buf = memory.ToArray ();
 #endif
 				long startIndex = 0;
 

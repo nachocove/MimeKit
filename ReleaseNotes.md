@@ -1,5 +1,43 @@
 # Release Notes
 
+### MimeKit 1.2.9
+
+* Fixed WriteTo(string fileName) methods to overwrite the existing file. (issue #154)
+* Updated InternetAddressList to implement IComparable.
+* Fixed DKIM-Signature generation and verification.
+* Added support for Message-Id headers that do not properly use encapsulate the value
+  with angle brackets.
+
+### MimeKit 1.2.8
+
+* Added a new MessageDeliveryStatus MimePart subclass to make message/delivery-status
+  MIME parts easier to deal with.
+* Improved HtmlTokenizer's support for the script tag - it is should now be completely
+  bug free.
+* Fixed to filter out duplicate recipients when encrypting for S/MIME or PGP.
+* Fixed MimeParser to handle a message stream of just "\r\n".
+* Add a leading space in the Sender and Resent-Sender header values.
+
+### MimeKit 1.2.7
+
+* Fixed encoding GroupAddress with multiple mailbox addresses.
+* Fixed MessageIdList to be less strict in what it will accept.
+* Fixed logic for DKIM-Signature header folding.
+
+### MimeKit 1.2.6
+
+* Fixed a bug in the HTML tokenizer to handle some weird HTML created by Outlook 15.0.
+* Added CmsRecipient .ctor overloads that accept X509Certificate2. (issue #149)
+
+### MimeKit 1.2.5
+
+* Changed BodyParts and Attachments to be IEnumerable<MimeEntity> -
+  WARNING! This is an API change! (issue #148)
+* Moved the IsAttachment property from MimePart down into MimeEntity.
+* Added MimeMessage.Importance and MimeMessage.Priority properties.
+* Vastly improved the HtmlToHtml text converter with a w3 compliant
+  HTML tokenizer.
+
 ### MimeKit 1.2.4
 
 * Added support for generating and verifying DKIM-Signature headers.

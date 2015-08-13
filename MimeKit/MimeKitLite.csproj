@@ -19,7 +19,7 @@
     <Optimize>False</Optimize>
     <OutputPath>bin\Debug\lib\net45</OutputPath>
     <IntermediateOutputPath>obj\Debug\lib\net45</IntermediateOutputPath>
-    <DefineConstants>DEBUG;TRACE;ENABLE_SNM</DefineConstants>
+    <DefineConstants>DEBUG;TRACE;SERIALIZABLE;ENABLE_SNM</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
@@ -28,7 +28,7 @@
     <Optimize>True</Optimize>
     <OutputPath>bin\Release\lib\net45</OutputPath>
     <IntermediateOutputPath>obj\Release\lib\net45</IntermediateOutputPath>
-    <DefineConstants>TRACE;ENABLE_SNM</DefineConstants>
+    <DefineConstants>TRACE;SERIALIZABLE;ENABLE_SNM</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -92,7 +92,7 @@
     <Compile Include="Text\HtmlAttributeId.cs" />
     <Compile Include="Text\HtmlEntityDecoder.cs" />
     <Compile Include="Text\HtmlEntityDecoder.g.cs">
-      <DependentUpon>Text\HtmlEntityDecoder.cs</DependentUpon>
+      <DependentUpon>HtmlEntityDecoder.cs</DependentUpon>
     </Compile>
     <Compile Include="Text\HtmlNamespace.cs" />
     <Compile Include="Text\HtmlTagCallback.cs" />
@@ -155,14 +155,18 @@
     <Compile Include="HeaderId.cs" />
     <Compile Include="HeaderList.cs" />
     <Compile Include="HeaderListChangedEventArgs.cs" />
+    <Compile Include="HeaderListCollection.cs" />
     <Compile Include="IContentObject.cs" />
     <Compile Include="InternetAddress.cs" />
     <Compile Include="InternetAddressList.cs" />
     <Compile Include="MailboxAddress.cs" />
+    <Compile Include="MessageDeliveryStatus.cs" />
     <Compile Include="MessageDispositionNotification.cs" />
     <Compile Include="MessageIdList.cs" />
+    <Compile Include="MessageImportance.cs" />
     <Compile Include="MessagePart.cs" />
     <Compile Include="MessagePartial.cs" />
+    <Compile Include="MessagePriority.cs" />
     <Compile Include="MimeEntity.cs" />
     <Compile Include="MimeEntityConstructorArgs.cs" />
     <Compile Include="MimeFormat.cs" />

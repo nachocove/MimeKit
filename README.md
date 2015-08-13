@@ -1,13 +1,17 @@
 # MimeKit
 
-<a href="https://scan.coverity.com/projects/3201">
-  <img alt="Coverity Scan Build Status"
-       src="https://scan.coverity.com/projects/3201/badge.svg"/>
-</a>
+[![Issue Stats](http://www.issuestats.com/github/jstedfast/MimeKit/badge/pr)](http://www.issuestats.com/github/jstedfast/MimeKit)
+[![Issue Stats](http://www.issuestats.com/github/jstedfast/MimeKit/badge/issue)](http://www.issuestats.com/github/jstedfast/MimeKit)
+
+|             |Build Status|Code Coverage|Static Analysis|
+|-------------|:----------:|:-----------:|:-------------:|
+|**Linux/Mac**|[![Build Status](https://travis-ci.org/jstedfast/MimeKit.svg)](https://travis-ci.org/jstedfast/MimeKit)|[![Code Coverage](https://coveralls.io/repos/jstedfast/MimeKit/badge.svg?branch=HEAD&service=github)](https://coveralls.io/r/jstedfast/MimeKit?branch=HEAD)|[![Static Analysis](https://scan.coverity.com/projects/3201/badge.svg)](https://scan.coverity.com/projects/3201)|
+|**Windows**  |[![Build Status](https://ci.appveyor.com/api/projects/status/07h7cobihqficw3s/branch/master?svg=true)](https://ci.appveyor.com/project/jstedfast/mimekit/branch/master)|[![Code Coverage](https://coveralls.io/repos/jstedfast/MimeKit/badge.svg?branch=HEAD&service=github)](https://coveralls.io/r/jstedfast/MimeKit?branch=HEAD)|[![Static Analysis](https://scan.coverity.com/projects/3201/badge.svg)](https://scan.coverity.com/projects/3201)|
 
 ## What is MimeKit?
 
-MimeKit is a C# library which may be used for the creation and parsing of messages using the Multipurpose Internet Mail Extension (MIME), as defined by [numerous IETF specifications](https://github.com/jstedfast/MimeKit/blob/master/RFCs.md).
+MimeKit is a C# library which may be used for the creation and parsing of messages using the Multipurpose
+Internet Mail Extension (MIME), as defined by [numerous IETF specifications](https://github.com/jstedfast/MimeKit/blob/master/RFCs.md).
 
 ## History
 
@@ -29,17 +33,17 @@ flexibility in that I'd be able use Generics and create a more .NET-compliant AP
 While mainstream beliefs may suggest that C# can never be as fast as C, it turns out that with a bit of creative
 parser design and a few clever optimizations 
 <sup>[[1](http://jeffreystedfast.blogspot.com/2013/09/optimization-tips-tricks-used-by.html)]
-[[2](http://jeffreystedfast.blogspot.com/2013/10/optimization-tips-tricks-used-by.html)]</sup>, MimeKit's performance
-is actually [on par with GMime](http://jeffreystedfast.blogspot.com/2014/03/gmime-gets-speed-boost.html).
+[[2](http://jeffreystedfast.blogspot.com/2013/10/optimization-tips-tricks-used-by.html)]</sup>, MimeKit's
+performance is actually [on par with GMime](http://jeffreystedfast.blogspot.com/2014/03/gmime-gets-speed-boost.html).
 
 Since GMime is pretty well-known as a high-performance native MIME parser and MimeKit more-or-less matches GMime's
 performance, it stands to reason that MimeKit is likely unsurpassed in performance in the .NET MIME parser space.
 
 For a comparison, as I [blogged here](http://jeffreystedfast.blogspot.com/2013/10/optimization-tips-tricks-used-by.html)
-(I have since optimized MimeKit by at least another 30%), MimeKit is more than 25x faster than OpenPOP.NET, 75x faster
-than SharpMimeTools, and 65x faster than regex-based parsers. Even the commercial MIME parser offerings such as LimiLabs'
-Mail.dll and NewtonIdeas' Mime4Net cannot even come close to matching MimeKit's performance (they are both orders of
-magnitude slower than MimeKit).
+(I have since optimized MimeKit by at least another 30%), MimeKit is more than 25x faster than OpenPOP.NET, 75x
+faster than SharpMimeTools, and 65x faster than regex-based parsers. Even the commercial MIME parser offerings such
+as LimiLabs' Mail.dll and NewtonIdeas' Mime4Net cannot even come close to matching MimeKit's performance (they are
+both orders of magnitude slower than MimeKit).
 
 For comparison purposes, I've published a [MIME parser benchmark](https://github.com/jstedfast/MimeParserBenchmark)
 to make it easier for anyone else to compare the performance of MimeKit to their favourite MIME parser.
@@ -98,28 +102,24 @@ simply enter the following command:
 
 ## Building
 
-First, you'll need to clone MimeKit and Bouncy Castle from my GitHub repository:
+First, you'll need to clone MimeKit from my GitHub repository:
 
     git clone https://github.com/jstedfast/MimeKit.git
-    git clone https://github.com/jstedfast/bc-csharp.git
-    git clone https://github.com/jstedfast/Portable.Text.Encoding.git
-
-Currently, MimeKit depends on the vs2010 branch of bc-csharp for the Visual Studio 2010 project
-files that I've added (to replace the Visual Studio 2003 project files). To switch to that branch,
-
-    cd bc-csharp
-    git checkout -b vs2010 origin/vs2010
+    cd MimeKit
+    git submodule update --init --recursive
 
 In the top-level MimeKit source directory, there are several solution files:
 
-* MimeKit.sln includes projects for .NET 4.5, .NET 4.0, PCL (Profile7 and Profile111), Xamarin.Android, Xamarin.iOS, and Xamarin.Mac as well as the unit tests.
+* MimeKit.sln includes projects for .NET 3.5, .NET 4.0, .NET 4.5, PCL (Profile7 and Profile111), Xamarin.Android,
+  and Xamarin.iOS as well as the unit tests.
 * MimeKit.Mobile.sln just includes the Xamarin.Android and Xamarin.iOS projects.
 * MimeKit.Net40.sln just includes the .NET 4.0 project.
+* MimeKit.Net45.sln includes the .NET 4.5 project and the unit tests.
 
-If you don't have the Xamarin products, you'll probably want to open the MimeKit.Net40.sln instead of MimeKit.sln.
+If you don't have the Xamarin products, you'll probably want to open the MimeKit.Net45.sln instead of MimeKit.sln.
 
-Once you've opened the appropriate MimeKit solution file in either Xamarin Studio or Visual Studio 2010+ (either will work),
-you can simply choose the Debug or Release build configuration and then build.
+Once you've opened the appropriate MimeKit solution file in either Xamarin Studio or Visual Studio 2010+ (either
+will work), you can simply choose the Debug or Release build configuration and then build.
 
 Note: The Release build will generate the xml API documentation, but the Debug build will not.
 
@@ -807,3 +807,6 @@ Before opening a new issue, please search for existing issues to avoid submittin
 ## Documentation
 
 API documentation can be found at [http://mimekit.net/docs](http://mimekit.net/docs).
+
+A copy of the xml formatted API documentation is also included in the NuGet and/or
+Xamarin Component package.

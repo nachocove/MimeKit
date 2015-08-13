@@ -41,6 +41,9 @@ namespace MimeKit.Text {
 	/// <remarks>
 	/// An HTML writer.
 	/// </remarks>
+	/// <example>
+	/// <code language="c#" source="Examples\MimeVisitorExamples.cs" region="HtmlPreviewVisitor" />
+	/// </example>
 	public class HtmlWriter : IDisposable
 	{
 		TextWriter html;
@@ -170,7 +173,7 @@ namespace MimeKit.Text {
 				throw new InvalidOperationException ("Attribute values can only be written in the Attribute state.");
 
 			html.Write ('=');
-			HtmlUtils.HtmlEncodeAttribute (html, value, startIndex, count);
+			HtmlUtils.HtmlAttributeEncode (html, value, startIndex, count);
 			WriterState = HtmlWriterState.Tag;
 		}
 
@@ -180,7 +183,7 @@ namespace MimeKit.Text {
 				throw new InvalidOperationException ("Attribute values can only be written in the Attribute state.");
 
 			html.Write ('=');
-			HtmlUtils.HtmlEncodeAttribute (html, value);
+			HtmlUtils.HtmlAttributeEncode (html, value);
 			WriterState = HtmlWriterState.Tag;
 		}
 
@@ -316,6 +319,9 @@ namespace MimeKit.Text {
 		/// <remarks>
 		/// Writes the attribute to the output stream.
 		/// </remarks>
+		/// <example>
+		/// <code language="c#" source="Examples\MimeVisitorExamples.cs" region="HtmlPreviewVisitor" />
+		/// </example>
 		/// <param name="name">The attribute name.</param>
 		/// <param name="value">The attribute value.</param>
 		/// <exception cref="System.ArgumentNullException">
@@ -350,6 +356,9 @@ namespace MimeKit.Text {
 		/// <remarks>
 		/// Writes the attribute to the output stream.
 		/// </remarks>
+		/// <example>
+		/// <code language="c#" source="Examples\MimeVisitorExamples.cs" region="HtmlPreviewVisitor" />
+		/// </example>
 		/// <param name="attribute">The attribute.</param>
 		/// <exception cref="System.ArgumentNullException">
 		/// <paramref name="attribute"/> is <c>null</c>.
@@ -406,6 +415,9 @@ namespace MimeKit.Text {
 		/// <remarks>
 		/// Writes the attribute name to the output stream.
 		/// </remarks>
+		/// <example>
+		/// <code language="c#" source="Examples\MimeVisitorExamples.cs" region="HtmlPreviewVisitor" />
+		/// </example>
 		/// <param name="name">The attribute name.</param>
 		/// <exception cref="System.ArgumentNullException">
 		/// <paramref name="name"/> is <c>null</c>.
@@ -470,6 +482,9 @@ namespace MimeKit.Text {
 		/// <remarks>
 		/// Writes the attribute value to the output stream.
 		/// </remarks>
+		/// <example>
+		/// <code language="c#" source="Examples\MimeVisitorExamples.cs" region="HtmlPreviewVisitor" />
+		/// </example>
 		/// <param name="value">The attribute value.</param>
 		/// <exception cref="System.ArgumentNullException">
 		/// <paramref name="value"/> is <c>null</c>.

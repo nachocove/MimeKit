@@ -459,6 +459,7 @@ namespace MimeKit.Utils {
 						int codepage = token.CodePage;
 						IMimeDecoder decoder;
 						int outlen, n;
+						byte* outptr;
 
 						// find the end of this run (and measure the buffer length we'll need)
 						for (n = i + 1; n < tokens.Count; n++) {
@@ -472,8 +473,9 @@ namespace MimeKit.Utils {
 						else
 							decoder = qp;
 
-						byte* outptr = outbuf;
+						outptr = outbuf;
 						outlen = 0;
+
 						do {
 							// Note: by not resetting the decoder state each loop, we effectively
 							// treat the payloads as one continuous block, thus allowing us to
@@ -1037,7 +1039,7 @@ namespace MimeKit.Utils {
 
 		static int EstimateEncodedWordLength (Encoding charset, int byteCount, int encodeCount)
 		{
-			return EstimateEncodedWordLength (charset.HeaderName, byteCount, encodeCount);
+			return EstimateEncodedWordLength (CharsetUtils.GetMimeCharset (charset), byteCount, encodeCount);
 		}
 
 		static bool ExceedsMaxLineLength (FormatOptions options, Encoding charset, Word word)

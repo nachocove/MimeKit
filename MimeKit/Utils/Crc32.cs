@@ -95,7 +95,7 @@ namespace MimeKit.Utils {
 		/// </remarks>
 		public Crc32 Clone ()
 		{
-			return new Crc32 { crc = crc };
+			return new Crc32 (initialValue) { crc = crc };
 		}
 
 		/// <summary>
@@ -117,7 +117,7 @@ namespace MimeKit.Utils {
 			if (offset < 0 || offset > buffer.Length)
 				throw new ArgumentOutOfRangeException ("offset");
 
-			if (count < 0 || offset + count > buffer.Length)
+			if (count < 0 || count > (buffer.Length - offset))
 				throw new ArgumentOutOfRangeException ("count");
 		}
 

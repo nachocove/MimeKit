@@ -19,7 +19,7 @@
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\lib\Xamarin.iOS</OutputPath>
     <IntermediateOutputPath>obj\Debug\lib\Xamarin.iOS</IntermediateOutputPath>
-    <DefineConstants>DEBUG;ENABLE_SNM;__MOBILE__;__IOS__</DefineConstants>
+    <DefineConstants>DEBUG;SERIALIZABLE;ENABLE_SNM;__MOBILE__;__IOS__</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <ConsolePause>false</ConsolePause>
@@ -33,7 +33,7 @@
     <WarningLevel>4</WarningLevel>
     <ConsolePause>false</ConsolePause>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <DefineConstants>ENABLE_SNM;__MOBILE__;__IOS__</DefineConstants>
+    <DefineConstants>SERIALIZABLE;ENABLE_SNM;__MOBILE__;__IOS__</DefineConstants>
     <GenerateDocumentation>True</GenerateDocumentation>
     <DocumentationFile>bin\Release\lib\Xamarin.iOS\MimeKitLite.xml</DocumentationFile>
   </PropertyGroup>
@@ -92,7 +92,7 @@
     <Compile Include="Text\HtmlAttributeId.cs" />
     <Compile Include="Text\HtmlEntityDecoder.cs" />
     <Compile Include="Text\HtmlEntityDecoder.g.cs">
-      <DependentUpon>Text\HtmlEntityDecoder.cs</DependentUpon>
+      <DependentUpon>HtmlEntityDecoder.cs</DependentUpon>
     </Compile>
     <Compile Include="Text\HtmlNamespace.cs" />
     <Compile Include="Text\HtmlTagCallback.cs" />
@@ -155,14 +155,18 @@
     <Compile Include="HeaderId.cs" />
     <Compile Include="HeaderList.cs" />
     <Compile Include="HeaderListChangedEventArgs.cs" />
+    <Compile Include="HeaderListCollection.cs" />
     <Compile Include="IContentObject.cs" />
     <Compile Include="InternetAddress.cs" />
     <Compile Include="InternetAddressList.cs" />
     <Compile Include="MailboxAddress.cs" />
+    <Compile Include="MessageDeliveryStatus.cs" />
     <Compile Include="MessageDispositionNotification.cs" />
     <Compile Include="MessageIdList.cs" />
+    <Compile Include="MessageImportance.cs" />
     <Compile Include="MessagePart.cs" />
     <Compile Include="MessagePartial.cs" />
+    <Compile Include="MessagePriority.cs" />
     <Compile Include="MimeEntity.cs" />
     <Compile Include="MimeEntityConstructorArgs.cs" />
     <Compile Include="MimeFormat.cs" />

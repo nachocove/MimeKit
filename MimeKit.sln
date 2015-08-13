@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2013
-VisualStudioVersion = 12.0.31101.0
+# Visual Studio 14
+VisualStudioVersion = 14.0.23107.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MimeKit", "MimeKit\MimeKit.csproj", "{D5F54A4F-D84B-430F-9271-F7861E285B3E}"
 EndProject
@@ -15,17 +15,17 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MimeKit.iOS", "MimeKit\Mime
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MimeKit.Portable", "MimeKit\MimeKit.Portable.csproj", "{BE542CE1-F773-467E-8DED-D02B89C5040A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BouncyCastle", "..\bc-csharp\crypto\BouncyCastle.csproj", "{4C235092-820C-4DEB-9074-D356FB797D8B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BouncyCastle", "submodules\bc-csharp\crypto\BouncyCastle.csproj", "{4C235092-820C-4DEB-9074-D356FB797D8B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BouncyCastle.Android", "..\bc-csharp\crypto\BouncyCastle.Android.csproj", "{A0D302CB-8866-4AB1-98B9-F0772EABF5DF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BouncyCastle.Android", "submodules\bc-csharp\crypto\BouncyCastle.Android.csproj", "{A0D302CB-8866-4AB1-98B9-F0772EABF5DF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BouncyCastle.iOS", "..\bc-csharp\crypto\BouncyCastle.iOS.csproj", "{0249241C-205E-4AC0-828B-90F822359B9E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BouncyCastle.iOS", "submodules\bc-csharp\crypto\BouncyCastle.iOS.csproj", "{0249241C-205E-4AC0-828B-90F822359B9E}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mono.Data.Sqlite", "Mono.Data.Sqlite\Mono.Data.Sqlite.csproj", "{F26434C1-BA3D-41FB-B560-C009CB72B1B6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Portable.Text.Encoding", "..\Portable.Text.Encoding\Portable.Text.Encoding\Portable.Text.Encoding.csproj", "{EEE48C75-11BE-4B50-B759-F85B5052D473}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Portable.Text.Encoding", "submodules\Portable.Text.Encoding\Portable.Text.Encoding\Portable.Text.Encoding.csproj", "{EEE48C75-11BE-4B50-B759-F85B5052D473}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Portable.Text.Encoding.WindowsUniversal81", "..\Portable.Text.Encoding\Portable.Text.Encoding\Portable.Text.Encoding.WindowsUniversal81.csproj", "{B76A64F9-B00E-4243-AE89-5D024CA3B436}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Portable.Text.Encoding.WindowsUniversal81", "submodules\Portable.Text.Encoding\Portable.Text.Encoding\Portable.Text.Encoding.WindowsUniversal81.csproj", "{B76A64F9-B00E-4243-AE89-5D024CA3B436}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MimeKit.WindowsUniversal81", "MimeKit\MimeKit.WindowsUniversal81.csproj", "{D9906B8C-7BBD-4CCE-AC7C-E9BCA020D20C}"
 EndProject
@@ -98,32 +98,28 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(MonoDevelopProperties) = preSolution
-		StartupItem = MimeKit\MimeKit.csproj
 		Policies = $0
 		$0.StandardHeader = $1
 		$1.Text = @\n${FileName}\n \nAuthor: ${AuthorName} <${AuthorEmail}>\n\nCopyright (c) ${Year} ${CopyrightHolder}\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the "Software"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in\nall copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN\nTHE SOFTWARE.\n
 		$1.IncludeInNewFiles = True
-		$0.TextStylePolicy = $4
-		$2.inheritsSet = null
-		$2.scope = text/x-csharp
-		$0.CSharpFormattingPolicy = $3
-		$3.NamespaceBraceStyle = EndOfLine
-		$3.StructBraceStyle = EndOfLine
-		$3.EnumBraceStyle = EndOfLine
-		$3.AfterDelegateDeclarationParameterComma = True
-		$3.BeforeSizeOfParentheses = True
-		$3.BeforeTypeOfParentheses = True
-		$3.SpacesBeforeBrackets = False
-		$3.SpacesAfterTypecast = True
-		$3.AlignToFirstIndexerArgument = True
-		$3.inheritsSet = Mono
-		$3.inheritsScope = text/x-csharp
+		$0.TextStylePolicy = $3
+		$2.FileWidth = 120
+		$2.TabsToSpaces = False
+		$2.inheritsSet = VisualStudio
+		$2.inheritsScope = text/plain
+		$3.inheritsSet = null
 		$3.scope = text/x-csharp
-		$4.FileWidth = 120
-		$4.TabsToSpaces = False
-		$4.EolMarker = Unix
-		$4.inheritsSet = VisualStudio
-		$4.inheritsScope = text/plain
-		$4.scope = text/plain
+		$0.CSharpFormattingPolicy = $4
+		$4.NamespaceBraceStyle = EndOfLine
+		$4.StructBraceStyle = EndOfLine
+		$4.EnumBraceStyle = EndOfLine
+		$4.AfterDelegateDeclarationParameterComma = True
+		$4.BeforeSizeOfParentheses = True
+		$4.BeforeTypeOfParentheses = True
+		$4.SpacesBeforeBrackets = False
+		$4.SpacesAfterTypecast = True
+		$4.inheritsSet = Mono
+		$4.inheritsScope = text/x-csharp
+		$4.scope = text/x-csharp
 	EndGlobalSection
 EndGlobal

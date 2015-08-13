@@ -38,6 +38,9 @@ namespace MimeKit {
 	/// This class is designed to be inherited to create more specialized classes whose
 	/// functionality requires traversing, examining or copying a MIME tree.
 	/// </remarks>
+	/// <example>
+	/// <code language="c#" source="Examples\MimeVisitorExamples.cs" region="HtmlPreviewVisitor" />
+	/// </example>
 	public abstract class MimeVisitor
 	{
 		/// <summary>
@@ -132,6 +135,18 @@ namespace MimeKit {
 		}
 
 		/// <summary>
+		/// Visit the message/delivery-status MIME entity.
+		/// </summary>
+		/// <remarks>
+		/// Visits the message/delivery-status MIME entity.
+		/// </remarks>
+		/// <param name="entity">The message/delivery-status MIME entity.</param>
+		protected internal virtual void VisitMessageDeliveryStatus (MessageDeliveryStatus entity)
+		{
+			VisitMimePart (entity);
+		}
+
+		/// <summary>
 		/// Visit the message contained within a message/rfc822 or message/news MIME entity.
 		/// </summary>
 		/// <remarks>
@@ -150,6 +165,9 @@ namespace MimeKit {
 		/// <remarks>
 		/// Visits the message/rfc822 or message/news MIME entity.
 		/// </remarks>
+		/// <example>
+		/// <code language="c#" source="Examples\MimeVisitorExamples.cs" region="HtmlPreviewVisitor" />
+		/// </example>
 		/// <param name="entity">The message/rfc822 or message/news MIME entity.</param>
 		protected internal virtual void VisitMessagePart (MessagePart entity)
 		{
@@ -211,6 +229,9 @@ namespace MimeKit {
 		/// <remarks>
 		/// Visits the MIME part entity.
 		/// </remarks>
+		/// <example>
+		/// <code language="c#" source="Examples\MimeVisitorExamples.cs" region="HtmlPreviewVisitor" />
+		/// </example>
 		/// <param name="entity">The MIME part entity.</param>
 		protected internal virtual void VisitMimePart (MimePart entity)
 		{
@@ -249,6 +270,9 @@ namespace MimeKit {
 		/// <remarks>
 		/// Visits the multipart/alternative MIME entity.
 		/// </remarks>
+		/// <example>
+		/// <code language="c#" source="Examples\MimeVisitorExamples.cs" region="HtmlPreviewVisitor" />
+		/// </example>
 		/// <param name="alternative">The multipart/alternative MIME entity.</param>
 		protected internal virtual void VisitMultipartAlternative (MultipartAlternative alternative)
 		{
@@ -275,6 +299,9 @@ namespace MimeKit {
 		/// <remarks>
 		/// Visits the multipart/related MIME entity.
 		/// </remarks>
+		/// <example>
+		/// <code language="c#" source="Examples\MimeVisitorExamples.cs" region="HtmlPreviewVisitor" />
+		/// </example>
 		/// <param name="related">The multipart/related MIME entity.</param>
 		protected internal virtual void VisitMultipartRelated (MultipartRelated related)
 		{
@@ -301,6 +328,9 @@ namespace MimeKit {
 		/// <remarks>
 		/// Visits the text-based MIME part entity.
 		/// </remarks>
+		/// <example>
+		/// <code language="c#" source="Examples\MimeVisitorExamples.cs" region="HtmlPreviewVisitor" />
+		/// </example>
 		/// <param name="entity">The text-based MIME part entity.</param>
 		protected internal virtual void VisitTextPart (TextPart entity)
 		{
@@ -313,6 +343,9 @@ namespace MimeKit {
 		/// <remarks>
 		/// Visits the Microsoft TNEF MIME part entity.
 		/// </remarks>
+		/// <example>
+		/// <code language="c#" source="Examples\MimeVisitorExamples.cs" region="HtmlPreviewVisitor" />
+		/// </example>
 		/// <param name="entity">The Microsoft TNEF MIME part entity.</param>
 		protected internal virtual void VisitTnefPart (TnefPart entity)
 		{

@@ -50,7 +50,7 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- A reference to the entire .NET Framework is automatically included -->
-    <ProjectReference Include="..\..\Portable.Text.Encoding\Portable.Text.Encoding\Portable.Text.Encoding.WindowsUniversal81.csproj">
+    <ProjectReference Include="..\submodules\Portable.Text.Encoding\Portable.Text.Encoding\Portable.Text.Encoding.WindowsUniversal81.csproj">
       <Project>{B76A64F9-B00E-4243-AE89-5D024CA3B436}</Project>
       <Name>Portable.Text.Encoding.WindowsUniversal81</Name>
     </ProjectReference>
@@ -98,7 +98,7 @@
     <Compile Include="Text\HtmlAttributeId.cs" />
     <Compile Include="Text\HtmlEntityDecoder.cs" />
     <Compile Include="Text\HtmlEntityDecoder.g.cs">
-      <DependentUpon>Text\HtmlEntityDecoder.cs</DependentUpon>
+      <DependentUpon>HtmlEntityDecoder.cs</DependentUpon>
     </Compile>
     <Compile Include="Text\HtmlNamespace.cs" />
     <Compile Include="Text\HtmlTagCallback.cs" />
@@ -161,14 +161,18 @@
     <Compile Include="HeaderId.cs" />
     <Compile Include="HeaderList.cs" />
     <Compile Include="HeaderListChangedEventArgs.cs" />
+    <Compile Include="HeaderListCollection.cs" />
     <Compile Include="IContentObject.cs" />
     <Compile Include="InternetAddress.cs" />
     <Compile Include="InternetAddressList.cs" />
     <Compile Include="MailboxAddress.cs" />
+    <Compile Include="MessageDeliveryStatus.cs" />
     <Compile Include="MessageDispositionNotification.cs" />
     <Compile Include="MessageIdList.cs" />
+    <Compile Include="MessageImportance.cs" />
     <Compile Include="MessagePart.cs" />
     <Compile Include="MessagePartial.cs" />
+    <Compile Include="MessagePriority.cs" />
     <Compile Include="MimeEntity.cs" />
     <Compile Include="MimeEntityConstructorArgs.cs" />
     <Compile Include="MimeFormat.cs" />

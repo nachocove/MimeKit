@@ -95,6 +95,38 @@ namespace UnitTests {
 		}
 
 		[Test]
+		public void TestEmptyHeaders ()
+		{
+			var bytes = Encoding.ASCII.GetBytes ("\r\n");
+
+			using (var memory = new MemoryStream (bytes, false)) {
+				try {
+					var headers = HeaderList.Load (memory);
+
+					Assert.AreEqual (0, headers.Count, "Unexpected header count.");
+				} catch (Exception ex) {
+					Assert.Fail ("Failed to parse headers: {0}", ex);
+				}
+			}
+		}
+
+		[Test]
+		public void TestEmptyMessage ()
+		{
+			var bytes = Encoding.ASCII.GetBytes ("\r\n");
+
+			using (var memory = new MemoryStream (bytes, false)) {
+				try {
+					var message = MimeMessage.Load (memory);
+
+					Assert.AreEqual (0, message.Headers.Count, "Unexpected header count.");
+				} catch (Exception ex) {
+					Assert.Fail ("Failed to parse message: {0}", ex);
+				}
+			}
+		}
+
+		[Test]
 		public void TestSimpleMbox ()
 		{
 			using (var stream = File.OpenRead ("../../TestData/mbox/simple.mbox.txt")) {
@@ -105,22 +137,22 @@ namespace UnitTests {
 					Multipart multipart;
 					MimeEntity entity;
 
-					Assert.IsInstanceOfType (typeof (Multipart), message.Body);
+					Assert.IsInstanceOf<Multipart> (message.Body);
 					multipart = (Multipart) message.Body;
 					Assert.AreEqual (1, multipart.Count);
 					entity = multipart[0];
 
-					Assert.IsInstanceOfType (typeof (Multipart), entity);
+					Assert.IsInstanceOf<Multipart> (entity);
 					multipart = (Multipart) entity;
 					Assert.AreEqual (1, multipart.Count);
 					entity = multipart[0];
 
-					Assert.IsInstanceOfType (typeof (Multipart), entity);
+					Assert.IsInstanceOf<Multipart> (entity);
 					multipart = (Multipart) entity;
 					Assert.AreEqual (1, multipart.Count);
 					entity = multipart[0];
 
-					Assert.IsInstanceOfType (typeof (TextPart), entity);
+					Assert.IsInstanceOf<TextPart> (entity);
 
 					using (var memory = new MemoryStream ()) {
 						entity.WriteTo (UnixFormatOptions, memory);
@@ -137,7 +169,7 @@ namespace UnitTests {
 			if (depth > 0)
 				builder.Append (new string (' ', depth * 3));
 
-			builder.AppendFormat ("Content-Type: {0}/{1}\n", entity.ContentType.MediaType, entity.ContentType.MediaSubtype);
+			builder.AppendFormat ("Content-Type: {0}/{1}", entity.ContentType.MediaType, entity.ContentType.MediaSubtype).Append ('\n');
 
 			if (entity is Multipart) {
 				var multipart = (Multipart) entity;
@@ -158,7 +190,7 @@ namespace UnitTests {
 				if (iter.Depth > 0)
 					builder.Append (new string (' ', iter.Depth * 3));
 
-				builder.AppendFormat ("Content-Type: {0}/{1}\n", ctype.MediaType, ctype.MediaSubtype);
+				builder.AppendFormat ("Content-Type: {0}/{1}", ctype.MediaType, ctype.MediaSubtype).Append ('\n');
 			}
 		}
 
@@ -168,7 +200,7 @@ namespace UnitTests {
 			string expected = @"Content-Type: multipart/mixed
    Content-Type: multipart/alternative
    Content-Type: text/plain
-";
+".Replace ("\r\n", "\n");
 
 			using (var stream = File.OpenRead ("../../TestData/messages/empty-multipart.txt")) {
 				var parser = new MimeParser (stream, MimeFormat.Entity);
@@ -184,7 +216,7 @@ namespace UnitTests {
 		[Test]
 		public void TestJwzMbox ()
 		{
-			var summary = File.ReadAllText ("../../TestData/mbox/jwz-summary.txt");
+			var summary = File.ReadAllText ("../../TestData/mbox/jwz-summary.txt").Replace ("\r\n", "\n");
 			var builder = new StringBuilder ();
 
 			using (var stream = File.OpenRead ("../../TestData/mbox/jwz.mbox.txt")) {
@@ -193,15 +225,15 @@ namespace UnitTests {
 				while (!parser.IsEndOfStream) {
 					var message = parser.ParseMessage ();
 
-					builder.AppendFormat ("{0}\n", parser.MboxMarker);
+					builder.AppendFormat ("{0}", parser.MboxMarker).Append ('\n');
 					if (message.From.Count > 0)
-						builder.AppendFormat ("From: {0}\n", message.From);
+						builder.AppendFormat ("From: {0}", message.From).Append ('\n');
 					if (message.To.Count > 0)
-						builder.AppendFormat ("To: {0}\n", message.To);
-					builder.AppendFormat ("Subject: {0}\n", message.Subject);
-					builder.AppendFormat ("Date: {0}\n", DateUtils.FormatDate (message.Date));
+						builder.AppendFormat ("To: {0}", message.To).Append ('\n');
+					builder.AppendFormat ("Subject: {0}", message.Subject).Append ('\n');
+					builder.AppendFormat ("Date: {0}", DateUtils.FormatDate (message.Date)).Append ('\n');
 					DumpMimeTree (builder, message);
-					builder.Append ("\n");
+					builder.Append ('\n');
 				}
 			}
 
@@ -218,24 +250,24 @@ namespace UnitTests {
 		[Test]
 		public void TestJwzPersistentMbox ()
 		{
-			var summary = File.ReadAllText ("../../TestData/mbox/jwz-summary.txt");
+			var summary = File.ReadAllText ("../../TestData/mbox/jwz-summary.txt").Replace ("\r\n", "\n");
 			var builder = new StringBuilder ();
 
 			using (var stream = File.OpenRead ("../../TestData/mbox/jwz.mbox.txt")) {
-				var parser = new MimeParser (stream, MimeFormat.Mbox, true);
+				var parser = new MimeParser (stream, MimeFormat.Mbox);
 
 				while (!parser.IsEndOfStream) {
 					var message = parser.ParseMessage ();
 
-					builder.AppendFormat ("{0}\n", parser.MboxMarker);
+					builder.AppendFormat ("{0}", parser.MboxMarker).Append ('\n');
 					if (message.From.Count > 0)
-						builder.AppendFormat ("From: {0}\n", message.From);
+						builder.AppendFormat ("From: {0}", message.From).Append ('\n');
 					if (message.To.Count > 0)
-						builder.AppendFormat ("To: {0}\n", message.To);
-					builder.AppendFormat ("Subject: {0}\n", message.Subject);
-					builder.AppendFormat ("Date: {0}\n", DateUtils.FormatDate (message.Date));
+						builder.AppendFormat ("To: {0}", message.To).Append ('\n');
+					builder.AppendFormat ("Subject: {0}", message.Subject).Append ('\n');
+					builder.AppendFormat ("Date: {0}", DateUtils.FormatDate (message.Date)).Append ('\n');
 					DumpMimeTree (builder, message);
-					builder.Append ("\n");
+					builder.Append ('\n');
 
 					// Force the various MimePart objects to write their content streams.
 					// The idea is that by forcing the MimeParts to seek in their content,
@@ -252,6 +284,46 @@ namespace UnitTests {
 				actual = actual.Replace (iso2022jp, "佐藤豊");
 
 			Assert.AreEqual (summary, actual, "Summaries do not match for jwz.mbox");
+		}
+
+		[Test]
+		public void TestJapaneseMessage ()
+		{
+			const string subject = "日本語メールテスト (testing Japanese emails)";
+			const string body = "Let's see if both subject and body works fine...\n\n日本語が\n正常に\n送れているか\nテスト.\n";
+
+			using (var stream = File.OpenRead ("../../TestData/messages/japanese.txt")) {
+				var message = MimeMessage.Load (stream);
+
+				Assert.AreEqual (subject, message.Subject, "Subject values do not match");
+				Assert.AreEqual (body, message.TextBody, "Message text does not match.");
+			}
+		}
+
+		[Test]
+		public void TestUnmungedFromLines ()
+		{
+			int count = 0;
+
+			using (var stream = File.OpenRead ("../../TestData/mbox/unmunged.mbox.txt")) {
+				var parser = new MimeParser (stream, MimeFormat.Mbox);
+
+				while (!parser.IsEndOfStream) {
+					parser.ParseMessage ();
+
+					var marker = parser.MboxMarker;
+
+					if ((count % 2) == 0) {
+						Assert.AreEqual ("From -", marker.TrimEnd (), "Message #{0}", count);
+					} else {
+						Assert.AreEqual ("From Russia with love", marker.TrimEnd (), "Message #{0}", count);
+					}
+
+					count++;
+				}
+			}
+
+			Assert.AreEqual (4, count, "Expected to find 4 messages.");
 		}
 
 		[Test]

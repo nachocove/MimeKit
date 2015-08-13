@@ -6,6 +6,7 @@
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{C909FC86-6084-41E5-B99C-DCDF2A5B7F82}</ProjectGuid>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>MimeKit</RootNamespace>
@@ -18,7 +19,7 @@
     <Optimize>False</Optimize>
     <OutputPath>bin\Debug\lib\net40</OutputPath>
     <IntermediateOutputPath>obj\Debug\lib\net40</IntermediateOutputPath>
-    <DefineConstants>DEBUG;TRACE;ENABLE_CRYPTO;ENABLE_SNM</DefineConstants>
+    <DefineConstants>DEBUG;TRACE;SERIALIZABLE;ENABLE_CRYPTO;ENABLE_SNM</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
@@ -27,7 +28,7 @@
     <Optimize>True</Optimize>
     <OutputPath>bin\Release\lib\net40</OutputPath>
     <IntermediateOutputPath>obj\Release\lib\net40</IntermediateOutputPath>
-    <DefineConstants>TRACE;ENABLE_CRYPTO;ENABLE_SNM</DefineConstants>
+    <DefineConstants>TRACE;SERIALIZABLE;ENABLE_CRYPTO;ENABLE_SNM</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -50,7 +51,7 @@
     <Reference Include="System.Security" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\bc-csharp\crypto\BouncyCastle.csproj">
+    <ProjectReference Include="..\submodules\bc-csharp\crypto\BouncyCastle.csproj">
       <Project>{4C235092-820C-4DEB-9074-D356FB797D8B}</Project>
       <Name>BouncyCastle</Name>
     </ProjectReference>
@@ -150,7 +151,7 @@
     <Compile Include="Text\HtmlAttributeId.cs" />
     <Compile Include="Text\HtmlEntityDecoder.cs" />
     <Compile Include="Text\HtmlEntityDecoder.g.cs">
-      <DependentUpon>Text\HtmlEntityDecoder.cs</DependentUpon>
+      <DependentUpon>HtmlEntityDecoder.cs</DependentUpon>
     </Compile>
     <Compile Include="Text\HtmlNamespace.cs" />
     <Compile Include="Text\HtmlTagCallback.cs" />
@@ -213,14 +214,18 @@
     <Compile Include="HeaderId.cs" />
     <Compile Include="HeaderList.cs" />
     <Compile Include="HeaderListChangedEventArgs.cs" />
+    <Compile Include="HeaderListCollection.cs" />
     <Compile Include="IContentObject.cs" />
     <Compile Include="InternetAddress.cs" />
     <Compile Include="InternetAddressList.cs" />
     <Compile Include="MailboxAddress.cs" />
+    <Compile Include="MessageDeliveryStatus.cs" />
     <Compile Include="MessageDispositionNotification.cs" />
     <Compile Include="MessageIdList.cs" />
+    <Compile Include="MessageImportance.cs" />
     <Compile Include="MessagePart.cs" />
     <Compile Include="MessagePartial.cs" />
+    <Compile Include="MessagePriority.cs" />
     <Compile Include="MimeEntity.cs" />
     <Compile Include="MimeEntityConstructorArgs.cs" />
     <Compile Include="MimeFormat.cs" />

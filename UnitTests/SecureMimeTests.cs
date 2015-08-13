@@ -26,7 +26,6 @@
 
 using System;
 using System.IO;
-using System.Text;
 using System.Collections.Generic;
 
 using NUnit.Framework;
@@ -78,7 +77,7 @@ namespace UnitTests {
 
 				var decompressed = compressed.Decompress (ctx);
 
-				Assert.IsInstanceOfType (typeof (TextPart), decompressed, "Decompressed part is not the expected type.");
+				Assert.IsInstanceOf<TextPart> (decompressed, "Decompressed part is not the expected type.");
 				Assert.AreEqual (original.Text, ((TextPart) decompressed).Text, "Decompressed content is not the same as the original.");
 			}
 		}
@@ -99,7 +98,7 @@ namespace UnitTests {
 
 				var signatures = signed.Verify (ctx, out extracted);
 
-				Assert.IsInstanceOfType (typeof (TextPart), extracted, "Extracted part is not the expected type.");
+				Assert.IsInstanceOf<TextPart> (extracted, "Extracted part is not the expected type.");
 				Assert.AreEqual (cleartext.Text, ((TextPart) extracted).Text, "Extracted content is not the same as the original.");
 
 				Assert.AreEqual (1, signatures.Count, "Verify returned an unexpected number of signatures.");
@@ -133,20 +132,27 @@ namespace UnitTests {
 		[Test]
 		public void TestSecureMimeSigning ()
 		{
+			var body = new TextPart ("plain") { Text = "This is some cleartext that we'll end up signing..." };
 			var self = new MailboxAddress ("MimeKit UnitTests", "mimekit@example.com");
+			var message = new MimeMessage { Subject = "Test of signing with S/MIME" };
 
-			var cleartext = new TextPart ("plain");
-			cleartext.Text = "This is some cleartext that we'll end up signing...";
+			message.From.Add (self);
+			message.Body = body;
 
 			using (var ctx = CreateContext ()) {
-				var multipart = MultipartSigned.Create (ctx, self, DigestAlgorithm.Sha1, cleartext);
+				message.Sign (ctx);
+
+				Assert.IsInstanceOf<MultipartSigned> (message.Body, "The message body should be a multipart/signed.");
+
+				var multipart = (MultipartSigned) message.Body;
+
 				Assert.AreEqual (2, multipart.Count, "The multipart/signed has an unexpected number of children.");
 
 				var protocol = multipart.ContentType.Parameters["protocol"];
 				Assert.AreEqual (ctx.SignatureProtocol, protocol, "The multipart/signed protocol does not match.");
 
-				Assert.IsInstanceOfType (typeof (TextPart), multipart[0], "The first child is not a text part.");
-				Assert.IsInstanceOfType (typeof (ApplicationPkcs7Signature), multipart[1], "The second child is not a detached signature.");
+				Assert.IsInstanceOf<TextPart> (multipart[0], "The first child is not a text part.");
+				Assert.IsInstanceOf<ApplicationPkcs7Signature> (multipart[1], "The second child is not a detached signature.");
 
 				var signatures = multipart.Verify (ctx);
 				Assert.AreEqual (1, signatures.Count, "Verify returned an unexpected number of signatures.");
@@ -188,12 +194,14 @@ namespace UnitTests {
 			}
 
 			using (var ctx = CreateContext ()) {
+				Assert.IsInstanceOf<MultipartSigned> (message.Body, "The message body should be a multipart/signed.");
+
 				var multipart = (MultipartSigned) message.Body;
 
 				var protocol = multipart.ContentType.Parameters["protocol"];
 				Assert.IsTrue (ctx.Supports (protocol), "The multipart/signed protocol is not supported.");
 
-				Assert.IsInstanceOfType (typeof (ApplicationPkcs7Signature), multipart[1], "The second child is not a detached signature.");
+				Assert.IsInstanceOf<ApplicationPkcs7Signature> (multipart[1], "The second child is not a detached signature.");
 
 				var signatures = multipart.Verify (ctx);
 				Assert.AreEqual (1, signatures.Count, "Verify returned an unexpected number of signatures.");
@@ -221,24 +229,27 @@ namespace UnitTests {
 		[Test]
 		public void TestSecureMimeEncryption ()
 		{
+			var body = new TextPart ("plain") { Text = "This is some cleartext that we'll end up encrypting..." };
 			var self = new MailboxAddress ("MimeKit UnitTests", "mimekit@example.com");
-			var recipients = new List<MailboxAddress> ();
+			var message = new MimeMessage { Subject = "Test of encrypting with S/MIME" };
 
-			// encrypt to ourselves...
-			recipients.Add (self);
-
-			var cleartext = new TextPart ("plain");
-			cleartext.Text = "This is some cleartext that we'll end up encrypting...";
+			message.From.Add (self);
+			message.To.Add (self);
+			message.Body = body;
 
 			using (var ctx = CreateContext ()) {
-				var encrypted = ApplicationPkcs7Mime.Encrypt (ctx, recipients, cleartext);
+				message.Encrypt (ctx);
+
+				Assert.IsInstanceOf<ApplicationPkcs7Mime> (message.Body, "The message body should be an application/pkcs7-mime part.");
+
+				var encrypted = (ApplicationPkcs7Mime) message.Body;
 
 				Assert.AreEqual (SecureMimeType.EnvelopedData, encrypted.SecureMimeType, "S/MIME type did not match.");
 
 				var decrypted = encrypted.Decrypt (ctx);
 
-				Assert.IsInstanceOfType (typeof (TextPart), decrypted, "Decrypted part is not the expected type.");
-				Assert.AreEqual (cleartext.Text, ((TextPart) decrypted).Text, "Decrypted content is not the same as the original.");
+				Assert.IsInstanceOf<TextPart> (decrypted, "Decrypted part is not the expected type.");
+				Assert.AreEqual (body.Text, ((TextPart) decrypted).Text, "Decrypted content is not the same as the original.");
 			}
 		}
 
@@ -276,30 +287,32 @@ namespace UnitTests {
 
 				// The decrypted part should be a multipart/mixed with a text/plain part and an image attachment,
 				// very much like the thunderbird-signed.txt message.
-				Assert.IsInstanceOfType (typeof (Multipart), decrypted, "Expected the decrypted part to be a Multipart.");
+				Assert.IsInstanceOf<Multipart> (decrypted, "Expected the decrypted part to be a Multipart.");
 				var multipart = (Multipart) decrypted;
 
-				Assert.IsInstanceOfType (typeof (TextPart), multipart[0], "Expected the first part of the decrypted multipart to be a TextPart.");
-				Assert.IsInstanceOfType (typeof (MimePart), multipart[1], "Expected the second part of the decrypted multipart to be a MimePart.");
+				Assert.IsInstanceOf<TextPart> (multipart[0], "Expected the first part of the decrypted multipart to be a TextPart.");
+				Assert.IsInstanceOf<MimePart> (multipart[1], "Expected the second part of the decrypted multipart to be a MimePart.");
 			}
 		}
 
 		[Test]
 		public void TestSecureMimeSignAndEncrypt ()
 		{
-			var self = new MailboxAddress ("MimeKit UnitTests", "mimekit@example.com");
-			var recipients = new List<MailboxAddress> ();
-
-			// encrypt to ourselves...
-			recipients.Add (self);
-
-			var cleartext = new TextPart ("plain");
-			cleartext.Text = "This is some cleartext that we'll end up encrypting...";
-
+			var body = new TextPart ("plain") { Text = "This is some cleartext that we'll end up signing and encrypting..." };
+			var self = new SecureMailboxAddress ("MimeKit UnitTests", "mimekit@example.com", "b7dd33847c3308dd9e12b4c3c94b545d76ab5e41");
+			var message = new MimeMessage { Subject = "Test of signing and encrypting with S/MIME" };
 			ApplicationPkcs7Mime encrypted;
 
+			message.From.Add (self);
+			message.To.Add (self);
+			message.Body = body;
+
 			using (var ctx = CreateContext ()) {
-				encrypted = ApplicationPkcs7Mime.SignAndEncrypt (ctx, self, DigestAlgorithm.Sha1, recipients, cleartext);
+				message.SignAndEncrypt (ctx);
+
+				Assert.IsInstanceOf<ApplicationPkcs7Mime> (message.Body, "The message body should be an application/pkcs7-mime part.");
+
+				encrypted = (ApplicationPkcs7Mime) message.Body;
 
 				Assert.AreEqual (SecureMimeType.EnvelopedData, encrypted.SecureMimeType, "S/MIME type did not match.");
 			}
@@ -308,14 +321,14 @@ namespace UnitTests {
 				var decrypted = encrypted.Decrypt (ctx);
 
 				// The decrypted part should be a multipart/signed
-				Assert.IsInstanceOfType (typeof (MultipartSigned), decrypted, "Expected the decrypted part to be a multipart/signed.");
+				Assert.IsInstanceOf<MultipartSigned> (decrypted, "Expected the decrypted part to be a multipart/signed.");
 				var signed = (MultipartSigned) decrypted;
 
-				Assert.IsInstanceOfType (typeof (TextPart), signed[0], "Expected the first part of the multipart/signed to be a multipart.");
-				Assert.IsInstanceOfType (typeof (ApplicationPkcs7Signature), signed[1], "Expected second part of the multipart/signed to be a pkcs7-signature.");
+				Assert.IsInstanceOf<TextPart> (signed[0], "Expected the first part of the multipart/signed to be a multipart.");
+				Assert.IsInstanceOf<ApplicationPkcs7Signature> (signed[1], "Expected second part of the multipart/signed to be a pkcs7-signature.");
 
 				var extracted = (TextPart) signed[0];
-				Assert.AreEqual (cleartext.Text, extracted.Text, "The decrypted text part's text does not match the original.");
+				Assert.AreEqual (body.Text, extracted.Text, "The decrypted text part's text does not match the original.");
 
 				var signatures = signed.Verify (ctx);
 
@@ -380,19 +393,19 @@ namespace UnitTests {
 				}
 
 				// The decrypted part should be a multipart/signed
-				Assert.IsInstanceOfType (typeof (MultipartSigned), decrypted, "Expected the decrypted part to be a multipart/signed.");
+				Assert.IsInstanceOf<MultipartSigned> (decrypted, "Expected the decrypted part to be a multipart/signed.");
 				var signed = (MultipartSigned) decrypted;
 
 				// The first part of the multipart/signed should be a multipart/mixed with a text/plain part and 2 image attachments,
 				// very much like the thunderbird-signed.txt message.
-				Assert.IsInstanceOfType (typeof (Multipart), signed[0], "Expected the first part of the multipart/signed to be a multipart.");
-				Assert.IsInstanceOfType (typeof (ApplicationPkcs7Signature), signed[1], "Expected second part of the multipart/signed to be a pkcs7-signature.");
+				Assert.IsInstanceOf<Multipart> (signed[0], "Expected the first part of the multipart/signed to be a multipart.");
+				Assert.IsInstanceOf<ApplicationPkcs7Signature> (signed[1], "Expected second part of the multipart/signed to be a pkcs7-signature.");
 
 				var multipart = (Multipart) signed[0];
 
-				Assert.IsInstanceOfType (typeof (TextPart), multipart[0], "Expected the first part of the decrypted multipart to be a TextPart.");
-				Assert.IsInstanceOfType (typeof (MimePart), multipart[1], "Expected the second part of the decrypted multipart to be a MimePart.");
-				Assert.IsInstanceOfType (typeof (MimePart), multipart[2], "Expected the third part of the decrypted multipart to be a MimePart.");
+				Assert.IsInstanceOf<TextPart> (multipart[0], "Expected the first part of the decrypted multipart to be a TextPart.");
+				Assert.IsInstanceOf<MimePart> (multipart[1], "Expected the second part of the decrypted multipart to be a MimePart.");
+				Assert.IsInstanceOf<MimePart> (multipart[2], "Expected the third part of the decrypted multipart to be a MimePart.");
 
 				var signatures = signed.Verify (ctx);
 
@@ -431,7 +444,7 @@ namespace UnitTests {
 			using (var ctx = CreateContext ()) {
 				var certsonly = ctx.Export (mailboxes);
 
-				Assert.IsInstanceOfType (typeof (ApplicationPkcs7Mime), certsonly, "The exported mime part is not of the expected type.");
+				Assert.IsInstanceOf<ApplicationPkcs7Mime> (certsonly, "The exported mime part is not of the expected type.");
 
 				var pkcs7mime = (ApplicationPkcs7Mime) certsonly;
 

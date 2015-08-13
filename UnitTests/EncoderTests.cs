@@ -71,8 +71,13 @@ namespace UnitTests {
 		public void TestBase64Encode ()
 		{
 			using (var original = new MemoryStream ()) {
-				using (var file = File.OpenRead ("../../TestData/encoders/photo.b64"))
-					file.CopyTo (original, 4096);
+				using (var file = File.OpenRead ("../../TestData/encoders/photo.b64")) {
+					using (var filtered = new FilteredStream (original)) {
+						filtered.Add (new Dos2UnixFilter ());
+						file.CopyTo (filtered, 4096);
+						filtered.Flush ();
+					}
+				}
 
 				using (var encoded = new MemoryStream ()) {
 					using (var filtered = new FilteredStream (encoded)) {
@@ -128,16 +133,19 @@ namespace UnitTests {
 		public void TestUUEncode ()
 		{
 			using (var original = new MemoryStream ()) {
-				using (var file = File.OpenRead ("../../TestData/encoders/photo.uu"))
-					file.CopyTo (original, 4096);
+				using (var file = File.OpenRead ("../../TestData/encoders/photo.uu")) {
+					using (var filtered = new FilteredStream (original)) {
+						filtered.Add (new Dos2UnixFilter ());
+						file.CopyTo (filtered, 4096);
+						filtered.Flush ();
+					}
+				}
 
 				using (var encoded = new MemoryStream ()) {
-					var begin = Encoding.ASCII.GetBytes ("begin 644 photo.jpg");
-					var eol = FormatOptions.Default.NewLineBytes;
-					var end = Encoding.ASCII.GetBytes ("end");
+					var begin = Encoding.ASCII.GetBytes ("begin 644 photo.jpg\n");
+					var end = Encoding.ASCII.GetBytes ("end\n");
 
 					encoded.Write (begin, 0, begin.Length);
-					encoded.Write (eol, 0, eol.Length);
 
 					using (var filtered = new FilteredStream (encoded)) {
 						filtered.Add (EncoderFilter.Create (ContentEncoding.UUEncode));
@@ -149,7 +157,6 @@ namespace UnitTests {
 					}
 
 					encoded.Write (end, 0, end.Length);
-					encoded.Write (eol, 0, eol.Length);
 
 					var buf0 = original.GetBuffer ();
 					var buf1 = encoded.GetBuffer ();
@@ -161,6 +168,81 @@ namespace UnitTests {
 						Assert.AreEqual (buf0[i], buf1[i], "The byte at offset {0} does not match.", i);
 				}
 			}
+		}
+
+		[Test]
+		public void TestQuotedPrintableDecode ()
+		{
+			const string input = "This is an ordinary text message in which my name (=ED=E5=EC=F9 =EF=E1 =E9=EC=E8=F4=F0)\nis in Hebrew (=FA=E9=F8=E1=F2).";
+			const string expected = "This is an ordinary text message in which my name (םולש ןב ילטפנ)\nis in Hebrew (תירבע).";
+			var encoding = Encoding.GetEncoding ("iso-8859-8");
+			var decoder = new QuotedPrintableDecoder ();
+			var output = new byte[4096];
+
+			var buf = Encoding.ASCII.GetBytes (input);
+			int n = decoder.Decode (buf, 0, buf.Length, output);
+			var actual = encoding.GetString (output, 0, n);
+
+			Assert.AreEqual (expected, actual);
+		}
+
+		[Test]
+		public void TestQuotedPrintableEncode ()
+		{
+			const string expected = "This is an ordinary text message in which my name (=ED=E5=EC=F9 =EF=E1=\n =E9=EC=E8=F4=F0)\nis in Hebrew (=FA=E9=F8=E1=F2).\n";
+			const string input = "This is an ordinary text message in which my name (םולש ןב ילטפנ)\nis in Hebrew (תירבע).\n";
+			var encoding = Encoding.GetEncoding ("iso-8859-8");
+			var encoder = new QuotedPrintableEncoder ();
+			var output = new byte[4096];
+
+			var buf = encoding.GetBytes (input);
+			int n = encoder.Flush (buf, 0, buf.Length, output);
+			var actual = Encoding.ASCII.GetString (output, 0, n);
+
+			Assert.AreEqual (expected, actual);
+		}
+
+		[Test]
+		public void TestPassThroughEncode ()
+		{
+			var encoder = new PassThroughEncoder (ContentEncoding.Default);
+			var output = new byte[4096];
+			var input = new byte[4096];
+
+			for (int i = 0; i < input.Length; i++)
+				input[i] = (byte) (i & 0xff);
+
+			int n = encoder.Encode (input, 0, input.Length, output);
+
+			Assert.AreEqual (input.Length, n);
+
+			for (int i = 0; i < n; i++)
+				Assert.AreEqual (input[i], output[i]);
+
+			n = encoder.Flush (input, 0, input.Length, output);
+
+			Assert.AreEqual (input.Length, n);
+
+			for (int i = 0; i < n; i++)
+				Assert.AreEqual (input[i], output[i]);
+		}
+
+		[Test]
+		public void TestPassThroughDecode ()
+		{
+			var decoder = new PassThroughDecoder (ContentEncoding.Default);
+			var output = new byte[4096];
+			var input = new byte[4096];
+
+			for (int i = 0; i < input.Length; i++)
+				input[i] = (byte) (i & 0xff);
+
+			int n = decoder.Decode (input, 0, input.Length, output);
+
+			Assert.AreEqual (input.Length, n);
+
+			for (int i = 0; i < n; i++)
+				Assert.AreEqual (input[i], output[i]);
 		}
 	}
 }

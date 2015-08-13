@@ -69,20 +69,27 @@ namespace UnitTests {
 		[Test]
 		public void TestPgpMimeSigning ()
 		{
+			var body = new TextPart ("plain") { Text = "This is some cleartext that we'll end up signing..." };
 			var self = new MailboxAddress ("MimeKit UnitTests", "mimekit@example.com");
+			var message = new MimeMessage { Subject = "Test of signing with OpenPGP" };
 
-			var cleartext = new TextPart ("plain");
-			cleartext.Text = "This is some cleartext that we'll end up signing...";
+			message.From.Add (self);
+			message.Body = body;
 
 			using (var ctx = new DummyOpenPgpContext ()) {
-				var multipart = MultipartSigned.Create (ctx, self, DigestAlgorithm.Sha1, cleartext);
+				message.Sign (ctx);
+
+				Assert.IsInstanceOf<MultipartSigned> (message.Body);
+
+				var multipart = (MultipartSigned) message.Body;
+
 				Assert.AreEqual (2, multipart.Count, "The multipart/signed has an unexpected number of children.");
 
 				var protocol = multipart.ContentType.Parameters["protocol"];
 				Assert.AreEqual (ctx.SignatureProtocol, protocol, "The multipart/signed protocol does not match.");
 
-				Assert.IsInstanceOfType (typeof (TextPart), multipart[0], "The first child is not a text part.");
-				Assert.IsInstanceOfType (typeof (ApplicationPgpSignature), multipart[1], "The second child is not a detached signature.");
+				Assert.IsInstanceOf<TextPart> (multipart[0], "The first child is not a text part.");
+				Assert.IsInstanceOf<ApplicationPgpSignature> (multipart[1], "The second child is not a detached signature.");
 
 				var signatures = multipart.Verify (ctx);
 				Assert.AreEqual (1, signatures.Count, "Verify returned an unexpected number of signatures.");
@@ -101,42 +108,48 @@ namespace UnitTests {
 		[Test]
 		public void TestPgpMimeEncryption ()
 		{
+			var body = new TextPart ("plain") { Text = "This is some cleartext that we'll end up encrypting..." };
 			var self = new MailboxAddress ("MimeKit UnitTests", "mimekit@example.com");
-			var recipients = new List<MailboxAddress> ();
+			var message = new MimeMessage { Subject = "Test of signing with OpenPGP" };
 
-			// encrypt to ourselves...
-			recipients.Add (self);
-
-			var cleartext = new TextPart ("plain");
-			cleartext.Text = "This is some cleartext that we'll end up encrypting...";
+			message.From.Add (self);
+			message.To.Add (self);
+			message.Body = body;
 
 			using (var ctx = new DummyOpenPgpContext ()) {
-				var encrypted = MultipartEncrypted.Create (ctx, recipients, cleartext);
+				message.Encrypt (ctx);
+
+				Assert.IsInstanceOf<MultipartEncrypted> (message.Body);
+
+				var encrypted = (MultipartEncrypted) message.Body;
 
 				//using (var file = File.Create ("pgp-encrypted.asc"))
 				//	encrypted.WriteTo (file);
 
 				var decrypted = encrypted.Decrypt (ctx);
 
-				Assert.IsInstanceOfType (typeof (TextPart), decrypted, "Decrypted part is not the expected type.");
-				Assert.AreEqual (cleartext.Text, ((TextPart) decrypted).Text, "Decrypted content is not the same as the original.");
+				Assert.IsInstanceOf<TextPart> (decrypted, "Decrypted part is not the expected type.");
+				Assert.AreEqual (body.Text, ((TextPart) decrypted).Text, "Decrypted content is not the same as the original.");
 			}
 		}
 
 		[Test]
 		public void TestPgpMimeSignAndEncrypt ()
 		{
-			var self = new MailboxAddress ("MimeKit UnitTests", "mimekit@example.com");
-			var recipients = new List<MailboxAddress> ();
+			var body = new TextPart ("plain") { Text = "This is some cleartext that we'll end up signing and encrypting..." };
+			var self = new SecureMailboxAddress ("MimeKit UnitTests", "mimekit@example.com", "AB0821A2");
+			var message = new MimeMessage { Subject = "Test of signing with OpenPGP" };
 
-			// encrypt to ourselves...
-			recipients.Add (self);
-
-			var cleartext = new TextPart ("plain");
-			cleartext.Text = "This is some cleartext that we'll end up encrypting...";
+			message.From.Add (self);
+			message.To.Add (self);
+			message.Body = body;
 
 			using (var ctx = new DummyOpenPgpContext ()) {
-				var encrypted = MultipartEncrypted.Create (ctx, self, DigestAlgorithm.Sha1, recipients, cleartext);
+				message.SignAndEncrypt (ctx);
+
+				Assert.IsInstanceOf<MultipartEncrypted> (message.Body);
+
+				var encrypted = (MultipartEncrypted) message.Body;
 
 				//using (var file = File.Create ("pgp-signed-encrypted.asc"))
 				//	encrypted.WriteTo (file);
@@ -144,8 +157,8 @@ namespace UnitTests {
 				DigitalSignatureCollection signatures;
 				var decrypted = encrypted.Decrypt (ctx, out signatures);
 
-				Assert.IsInstanceOfType (typeof (TextPart), decrypted, "Decrypted part is not the expected type.");
-				Assert.AreEqual (cleartext.Text, ((TextPart) decrypted).Text, "Decrypted content is not the same as the original.");
+				Assert.IsInstanceOf<TextPart> (decrypted, "Decrypted part is not the expected type.");
+				Assert.AreEqual (body.Text, ((TextPart) decrypted).Text, "Decrypted content is not the same as the original.");
 
 				Assert.AreEqual (1, signatures.Count, "Verify returned an unexpected number of signatures.");
 				foreach (var signature in signatures) {

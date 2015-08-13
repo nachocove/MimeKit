@@ -27,7 +27,6 @@
 using System;
 using System.IO;
 using System.Threading;
-using System.Collections.Generic;
 
 using NUnit.Framework;
 
@@ -155,7 +154,49 @@ namespace UnitTests
 				key = reader.ReadObject () as AsymmetricKeyParameter;
 			}
 
-			message.Verify (message.Headers[index], new DummyPublicKeyLocator (key));
+			Assert.IsTrue (message.Verify (message.Headers[index], new DummyPublicKeyLocator (key)), "Failed to verify GMail signature.");
+		}
+
+		static void TestDkimSignVerify (MimeMessage message, DkimSignatureAlgorithm signatureAlgorithm, DkimCanonicalizationAlgorithm headerAlgorithm, DkimCanonicalizationAlgorithm bodyAlgorithm)
+		{
+			var headers = new HeaderId[] { HeaderId.From, HeaderId.Subject, HeaderId.Date };
+			var signer = CreateSigner (signatureAlgorithm);
+
+			message.Sign (signer, headers, headerAlgorithm, bodyAlgorithm);
+
+			var dkim = message.Headers[0];
+
+			Assert.IsTrue (message.Verify (dkim, new DummyPublicKeyLocator (DkimKeys.Public)), "Failed to verify DKIM-Signature.");
+
+			message.Headers.RemoveAt (0);
+		}
+
+		[Test]
+		public void TestDkimSignVerifyJwzMbox ()
+		{
+			using (var stream = File.OpenRead ("../../TestData/mbox/jwz.mbox.txt")) {
+				var parser = new MimeParser (stream, MimeFormat.Mbox);
+
+				while (!parser.IsEndOfStream) {
+					var message = parser.ParseMessage ();
+
+					TestDkimSignVerify (message, DkimSignatureAlgorithm.RsaSha1,
+						DkimCanonicalizationAlgorithm.Relaxed,
+						DkimCanonicalizationAlgorithm.Relaxed);
+
+					TestDkimSignVerify (message, DkimSignatureAlgorithm.RsaSha256,
+						DkimCanonicalizationAlgorithm.Relaxed,
+						DkimCanonicalizationAlgorithm.Simple);
+
+					TestDkimSignVerify (message, DkimSignatureAlgorithm.RsaSha1,
+						DkimCanonicalizationAlgorithm.Simple,
+						DkimCanonicalizationAlgorithm.Relaxed);
+
+					TestDkimSignVerify (message, DkimSignatureAlgorithm.RsaSha256,
+						DkimCanonicalizationAlgorithm.Simple,
+						DkimCanonicalizationAlgorithm.Simple);
+				}
+			}
 		}
 	}
 }
