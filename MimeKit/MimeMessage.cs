@@ -62,7 +62,7 @@ namespace MimeKit {
 	/// tree of MIME entities such as a text/plain MIME part and a collection
 	/// of file attachments.</para>
 	/// </remarks>
-	public class MimeMessage : IDisposable
+	public class MimeMessage
 	{
 		static readonly string[] StandardAddressHeaders = {
 			"Resent-From", "Resent-Reply-To", "Resent-To", "Resent-Cc", "Resent-Bcc",
@@ -81,7 +81,6 @@ namespace MimeKit {
 		string messageId;
 		string inreplyto;
 		Version version;
-		bool disposed;
 
 		internal MimeMessage (ParserOptions options, IEnumerable<Header> headers)
 		{
@@ -237,19 +236,6 @@ namespace MimeKit {
 			Date = DateTimeOffset.Now;
 			Subject = string.Empty;
 			MessageId = MimeUtils.GenerateMessageId ();
-		}
-
-		/// <summary>
-		/// Releases unmanaged resources and performs other cleanup operations before the
-		/// <see cref="MimeKit.MimeMessage"/> is reclaimed by garbage collection.
-		/// </summary>
-		/// <remarks>
-		/// Releases unmanaged resources and performs other cleanup operations before the
-		/// <see cref="MimeKit.MimeMessage"/> is reclaimed by garbage collection.
-		/// </remarks>
-		~MimeMessage ()
-		{
-			Dispose (false);
 		}
 
 		/// <summary>
@@ -1231,56 +1217,47 @@ namespace MimeKit {
 #if ENABLE_CRYPTO
 		static void DkimWriteHeaderRelaxed (FormatOptions options, Stream stream, Header header, bool isDkimSignature)
 		{
+			// o  Convert all header field names (not the header field values) to
+			//    lowercase.  For example, convert "SUBJect: AbC" to "subject: AbC".
 			var name = Encoding.ASCII.GetBytes (header.Field.ToLowerInvariant ());
 			var rawValue = header.GetRawValue (options);
 			int index = 0;
 
+			// o  Delete any WSP characters remaining before and after the colon
+			//    separating the header field name from the header field value.  The
+			//    colon separator MUST be retained.
 			stream.Write (name, 0, name.Length);
 			stream.WriteByte ((byte) ':');
 
-			// look for the first non-whitespace character
-			while (index < rawValue.Length && rawValue[index].IsBlank ())
+			// trim leading whitespace...
+			while (index < rawValue.Length && rawValue[index].IsWhitespace ())
 				index++;
 
 			while (index < rawValue.Length) {
 				int startIndex = index;
-				int endIndex, nextLine;
 
 				// look for the first non-whitespace character
-				while (index < rawValue.Length && rawValue[index].IsBlank ())
+				while (index < rawValue.Length && rawValue[index].IsWhitespace ())
 					index++;
 
-				// look for the end of the line
-				endIndex = index;
-				while (endIndex < rawValue.Length && rawValue[endIndex] != (byte) '\n')
-					endIndex++;
+				// o  Delete all WSP characters at the end of each unfolded header field
+				//    value.
+				if (index >= rawValue.Length)
+					break;
 
-				nextLine = endIndex + 1;
-
-				if (endIndex > index && rawValue[endIndex - 1] == (byte) '\r')
-					endIndex--;
-
+				// o  Convert all sequences of one or more WSP characters to a single SP
+				//    character.  WSP characters here include those before and after a
+				//    line folding boundary.
 				if (index > startIndex)
 					stream.WriteByte ((byte) ' ');
 
-				while (index < endIndex) {
-					startIndex = index;
+				startIndex = index;
 
-					while (index < endIndex && !rawValue[index].IsBlank ())
-						index++;
+				while (index < rawValue.Length && !rawValue[index].IsWhitespace ())
+					index++;
 
+				if (index > startIndex)
 					stream.Write (rawValue, startIndex, index - startIndex);
-
-					startIndex = index;
-
-					while (index < endIndex && rawValue[index].IsBlank ())
-						index++;
-
-					if (index > startIndex)
-						stream.WriteByte ((byte) ' ');
-				}
-
-				index = nextLine;
 			}
 
 			if (!isDkimSignature)
@@ -1336,7 +1313,7 @@ namespace MimeKit {
 					if (Body != null) {
 						try {
 							Body.Headers.Suppress = true;
-							Body.WriteTo (options, stream, CancellationToken.None);
+							Body.WriteTo (options, filtered, CancellationToken.None);
 						} finally {
 							Body.Headers.Suppress = false;
 						}
@@ -1556,7 +1533,7 @@ namespace MimeKit {
 					index++;
 
 				if (index + 1 >= token.Length)
-					throw new FormatException ("Malformed DKIM-Signature value.");
+					continue;
 
 				name = token.Substring (startIndex, index - startIndex).Trim ();
 				index++;
@@ -1577,9 +1554,10 @@ namespace MimeKit {
 		}
 
 		static void ValidateDkimSignatureParameters (IDictionary<string, string> parameters, out DkimSignatureAlgorithm algorithm, out DkimCanonicalizationAlgorithm headerAlgorithm,
-			out DkimCanonicalizationAlgorithm bodyAlgorithm, out string d, out string s, out string q, out string h, out string bh, out string b, out int maxLength)
+			out DkimCanonicalizationAlgorithm bodyAlgorithm, out string d, out string s, out string q, out string[] headers, out string bh, out string b, out int maxLength)
 		{
-			string v, a, c, l;
+			bool containsFrom = false;
+			string v, a, c, h, l, id;
 
 			if (!parameters.TryGetValue ("v", out v))
 				throw new FormatException ("Malformed DKIM-Signature header: no version parameter detected.");
@@ -1598,6 +1576,19 @@ namespace MimeKit {
 
 			if (!parameters.TryGetValue ("d", out d))
 				throw new FormatException ("Malformed DKIM-Signature header: no domain parameter detected.");
+
+			if (parameters.TryGetValue ("i", out id)) {
+				string ident;
+				int at;
+
+				if ((at = id.LastIndexOf ('@')) == -1)
+					throw new FormatException ("Malformed DKIM-Signature header: no @ in the AUID value.");
+
+				ident = id.Substring (at + 1);
+
+				if (!ident.Equals (d, StringComparison.OrdinalIgnoreCase) && !ident.EndsWith ("." + d, StringComparison.OrdinalIgnoreCase))
+					throw new FormatException ("Invalid DKIM-Signature header: the domain in the AUID does not match the domain parameter.");
+			}
 
 			if (!parameters.TryGetValue ("s", out s))
 				throw new FormatException ("Malformed DKIM-Signature header: no selector parameter detected.");
@@ -1641,6 +1632,17 @@ namespace MimeKit {
 			if (!parameters.TryGetValue ("h", out h))
 				throw new FormatException ("Malformed DKIM-Signature header: no signed header parameter detected.");
 
+			headers = h.Split (':');
+			for (int i = 0; i < headers.Length; i++) {
+				if (headers[i].Equals ("from", StringComparison.OrdinalIgnoreCase)) {
+					containsFrom = true;
+					break;
+				}
+			}
+
+			if (!containsFrom)
+				throw new FormatException (string.Format ("Malformed DKIM-Signature header: From header not signed."));
+
 			if (!parameters.TryGetValue ("bh", out bh))
 				throw new FormatException ("Malformed DKIM-Signature header: no body hash parameter detected.");
 
@@ -1650,28 +1652,49 @@ namespace MimeKit {
 
 		static Header GetSignedDkimSignatureHeader (Header dkimSignature)
 		{
-			// modify the raw DKIM-Signature header value by chopping off the signature after the "b=" at the end
+			// modify the raw DKIM-Signature header value by chopping off the signature value after the "b="
 			var rawValue = (byte[]) dkimSignature.RawValue.Clone ();
-			int length = rawValue.Length;
+			int length = 0, index = 0;
 
-			// find the last ';' before the b=...
-			while (length > 0 && rawValue[length - 1] != (byte) ';')
-				length--;
+			do {
+				while (index < rawValue.Length && rawValue[index].IsWhitespace ())
+					index++;
 
-			// skip over any whitespace
-			while (length < rawValue.Length && rawValue[length].IsWhitespace ())
-				length++;
+				if (index + 2 < rawValue.Length) {
+					var param = (char) rawValue[index++];
 
-			if (length + 1 >= rawValue.Length || (rawValue[length] != (byte) 'b' && rawValue[length + 1] != (byte) '='))
-				throw new FormatException ("Malformed DKIM-Signature header: signature parameter is not at the end.");
+					while (index < rawValue.Length && rawValue[index].IsWhitespace ())
+						index++;
 
-			// skip over "b="
-			length += 2;
+					if (index < rawValue.Length && rawValue[index] == (byte) '=' && param == 'b') {
+						length = ++index;
 
-			if (length + 2 < rawValue.Length) {
-				rawValue[length++] = (byte) '\r';
-				rawValue[length++] = (byte) '\n';
-			}
+						while (index < rawValue.Length && rawValue[index] != (byte) ';')
+							index++;
+
+						if (index == rawValue.Length && rawValue[index - 1] == (byte) '\n') {
+							index--;
+
+							if (rawValue[index - 1] == (byte) '\r')
+								index--;
+						}
+
+						break;
+					}
+				}
+
+				while (index < rawValue.Length && rawValue[index] != (byte) ';')
+					index++;
+
+				if (index < rawValue.Length)
+					index++;
+			} while (index < rawValue.Length);
+
+			if (index == rawValue.Length)
+				throw new FormatException ("Malformed DKIM-Signature header: missing signature parameter.");
+
+			while (index < rawValue.Length)
+				rawValue[length++] = rawValue[index++];
 
 			Array.Resize (ref rawValue, length);
 
@@ -1722,11 +1745,12 @@ namespace MimeKit {
 			DkimCanonicalizationAlgorithm headerAlgorithm, bodyAlgorithm;
 			DkimSignatureAlgorithm signatureAlgorithm;
 			AsymmetricKeyParameter key;
-			string d, s, q, h, bh, b;
+			string d, s, q, bh, b;
+			string[] headers;
 			int maxLength;
 
 			ValidateDkimSignatureParameters (parameters, out signatureAlgorithm, out headerAlgorithm, out bodyAlgorithm,
-				out d, out s, out q, out h, out bh, out b, out maxLength);
+				out d, out s, out q, out headers, out bh, out b, out maxLength);
 
 			key = publicKeyLocator.LocatePublicKey (q, d, s, cancellationToken);
 
@@ -1743,7 +1767,7 @@ namespace MimeKit {
 				using (var filtered = new FilteredStream (stream)) {
 					filtered.Add (options.CreateNewLineFilter ());
 
-					DkimWriteHeaders (options, h.Split (':'), headerAlgorithm, filtered);
+					DkimWriteHeaders (options, headers, headerAlgorithm, filtered);
 
 					// now include the DKIM-Signature header that we are verifying,
 					// but only after removing the "b=" signature value.
@@ -2396,36 +2420,6 @@ namespace MimeKit {
 			default:
 				throw new ArgumentOutOfRangeException ();
 			}
-		}
-
-		/// <summary>
-		/// Releases the unmanaged resources used by the <see cref="MimeMessage"/> and
-		/// optionally releases the managed resources.
-		/// </summary>
-		/// <remarks>
-		/// Releases the unmanaged resources used by the <see cref="MimeMessage"/> and
-		/// optionally releases the managed resources.
-		/// </remarks>
-		/// <param name="disposing"><c>true</c> to release both managed and unmanaged resources;
-		/// <c>false</c> to release only the unmanaged resources.</param>
-		protected virtual void Dispose (bool disposing)
-		{
-			if (disposing && !disposed && Body != null)
-				Body.Dispose ();
-		}
-
-		/// <summary>
-		/// Releases all resources used by the <see cref="MimeKit.MimeMessage"/> object.
-		/// </summary>
-		/// <remarks>Call <see cref="Dispose()"/> when you are finished using the <see cref="MimeKit.MimeMessage"/>. The
-		/// <see cref="Dispose()"/> method leaves the <see cref="MimeKit.MimeMessage"/> in an unusable state. After
-		/// calling <see cref="Dispose()"/>, you must release all references to the <see cref="MimeKit.MimeMessage"/> so
-		/// the garbage collector can reclaim the memory that the <see cref="MimeKit.MimeMessage"/> was occupying.</remarks>
-		public void Dispose ()
-		{
-			Dispose (true);
-			GC.SuppressFinalize (this);
-			disposed = true;
 		}
 
 		/// <summary>

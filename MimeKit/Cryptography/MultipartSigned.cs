@@ -64,12 +64,6 @@ namespace MimeKit.Cryptography {
 		{
 		}
 
-		void CheckDisposed ()
-		{
-			if (IsDisposed)
-				throw new ObjectDisposedException ("MultipartSigned");
-		}
-
 		/// <summary>
 		/// Dispatches to the specific visit method for this MIME entity.
 		/// </summary>
@@ -85,15 +79,10 @@ namespace MimeKit.Cryptography {
 		/// <exception cref="System.ArgumentNullException">
 		/// <paramref name="visitor"/> is <c>null</c>.
 		/// </exception>
-		/// <exception cref="System.ObjectDisposedException">
-		/// The object has been disposed.
-		/// </exception>
 		public override void Accept (MimeVisitor visitor)
 		{
 			if (visitor == null)
 				throw new ArgumentNullException ("visitor");
-
-			CheckDisposed ();
 
 			visitor.VisitMultipartSigned (this);
 		}
@@ -426,15 +415,10 @@ namespace MimeKit.Cryptography {
 		/// <para>-or-</para>
 		/// <para><paramref name="constraint"/> is not a valid value.</para>
 		/// </exception>
-		/// <exception cref="System.ObjectDisposedException">
-		/// The object has been disposed.
-		/// </exception>
 		public override void Prepare (EncodingConstraint constraint, int maxLineLength = 78)
 		{
 			if (maxLineLength < 72 || maxLineLength > 998)
 				throw new ArgumentOutOfRangeException ("maxLineLength");
-
-			CheckDisposed ();
 
 			// Note: we do not iterate over our children because they are already signed
 			// and changing them would break the signature. They should already be
@@ -452,9 +436,6 @@ namespace MimeKit.Cryptography {
 		/// <exception cref="System.ArgumentNullException">
 		/// <paramref name="ctx"/> is <c>null</c>.
 		/// </exception>
-		/// <exception cref="System.ObjectDisposedException">
-		/// The object has been disposed.
-		/// </exception>
 		/// <exception cref="System.FormatException">
 		/// The multipart is malformed in some way.
 		/// </exception>
@@ -468,8 +449,6 @@ namespace MimeKit.Cryptography {
 		{
 			if (ctx == null)
 				throw new ArgumentNullException ("ctx");
-
-			CheckDisposed ();
 
 			var protocol = ContentType.Parameters["protocol"];
 			if (string.IsNullOrEmpty (protocol))
@@ -514,9 +493,6 @@ namespace MimeKit.Cryptography {
 		/// Verifies the multipart/signed part using the default cryptography context.
 		/// </remarks>
 		/// <returns>A signer info collection.</returns>
-		/// <exception cref="System.ObjectDisposedException">
-		/// The object has been disposed.
-		/// </exception>
 		/// <exception cref="System.FormatException">
 		/// <para>The <c>protocol</c> parameter was not specified.</para>
 		/// <para>-or-</para>
@@ -530,8 +506,6 @@ namespace MimeKit.Cryptography {
 		/// </exception>
 		public DigitalSignatureCollection Verify ()
 		{
-			CheckDisposed ();
-
 			var protocol = ContentType.Parameters["protocol"];
 			if (string.IsNullOrEmpty (protocol))
 				throw new FormatException ("The multipart/signed part did not specify a protocol.");
