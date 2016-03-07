@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -40,6 +40,7 @@ namespace MimeKit.Cryptography {
 	/// </remarks>
 	public abstract class CryptographyContext : IDisposable
 	{
+		const string SubclassAndRegisterFormat = "You need to subclass {0} and then register it with MimeKit.Cryptography.CryptographyContext.Register().";
 		static ConstructorInfo SecureMimeContextConstructor;
 		static ConstructorInfo OpenPgpContextConstructor;
 		static readonly object mutex = new object ();
@@ -314,10 +315,20 @@ namespace MimeKit.Cryptography {
 					if (SecureMimeContextConstructor != null)
 						return (CryptographyContext) SecureMimeContextConstructor.Invoke (new object[0]);
 
-					if (!SqliteCertificateDatabase.IsAvailable)
-						throw new NotSupportedException ("You need to subclass MimeKit.Cryptography.SecureMimeContext and then register it with MimeKit.Cryptography.CryptographyContext.Register().");
+#if !PORTABLE
+					if (!SqliteCertificateDatabase.IsAvailable) {
+						const string format = "SQLite is not available. Either install the {0} nuget or subclass MimeKit.Cryptography.SecureMimeContext and register it with MimeKit.Cryptography.CryptographyContext.Register().";
+#if COREFX
+						throw new NotSupportedException (string.Format (format, "Microsoft.Data.Sqlite"));
+#else
+						throw new NotSupportedException (string.Format (format, "System.Data.SQLite"));
+#endif
+					}
 
 					return new DefaultSecureMimeContext ();
+#else
+					throw new NotSupportedException (string.Format (SubclassAndRegisterFormat, "MimeKit.Cryptography.SecureMimeContext"));
+#endif
 				case "application/x-pgp-signature":
 				case "application/pgp-signature":
 				case "application/x-pgp-encrypted":
@@ -327,12 +338,28 @@ namespace MimeKit.Cryptography {
 					if (OpenPgpContextConstructor != null)
 						return (CryptographyContext) OpenPgpContextConstructor.Invoke (new object[0]);
 
-					throw new NotSupportedException ("You need to subclass MimeKit.Cryptography.GnuPGContext and then register it with MimeKit.Cryptography.CryptographyContext.Register().");
+					throw new NotSupportedException (string.Format (SubclassAndRegisterFormat, "MimeKit.Cryptography.OpenPgpContext or MimeKit.Cryptography.GnuPGContext"));
 				default:
 					throw new NotSupportedException ();
 				}
 			}
 		}
+
+#if PORTABLE
+		static ConstructorInfo GetConstructor (TypeInfo type)
+		{
+			foreach (var ctor in type.DeclaredConstructors) {
+				var args = ctor.GetParameters ();
+
+				if (args.Length != 0)
+					continue;
+
+				return ctor;
+			}
+
+			return null;
+		}
+#endif
 
 		/// <summary>
 		/// Registers a default <see cref="SecureMimeContext"/> or <see cref="OpenPgpContext"/>.
@@ -357,15 +384,25 @@ namespace MimeKit.Cryptography {
 			if (type == null)
 				throw new ArgumentNullException ("type");
 
+#if PORTABLE || COREFX
+			var info = type.GetTypeInfo ();
+#else
+			var info = type;
+#endif
+
+#if PORTABLE
+			var ctor = GetConstructor (info);
+#else
 			var ctor = type.GetConstructor (new Type[0]);
+#endif
 			if (ctor == null)
 				throw new ArgumentException ("The specified type must have a parameterless constructor.", "type");
 
-			if (type.IsSubclassOf (typeof (SecureMimeContext))) {
+			if (info.IsSubclassOf (typeof (SecureMimeContext))) {
 				lock (mutex) {
 					SecureMimeContextConstructor = ctor;
 				}
-			} else if (type.IsSubclassOf (typeof (OpenPgpContext))) {
+			} else if (info.IsSubclassOf (typeof (OpenPgpContext))) {
 				lock (mutex) {
 					OpenPgpContextConstructor = ctor;
 				}

@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -286,9 +286,6 @@ namespace MimeKit.Utils {
 			tzone = 0;
 
 			if (token.IsNumericZone) {
-				if ((token.Flags & DateTokenFlags.HasSign) == 0)
-					return false;
-
 				int endIndex = token.StartIndex + token.Length;
 				int index = token.StartIndex;
 				int sign;
@@ -314,9 +311,16 @@ namespace MimeKit.Utils {
 
 				if (!timezones.TryGetValue (name, out tzone))
 					return false;
-			} else {
-				return false;
+			} else if (token.IsNumeric) {
+				int endIndex = token.StartIndex + token.Length;
+				int index = token.StartIndex;
+
+				if (!ParseUtils.TryParseInt32 (text, ref index, endIndex, out tzone) || index != endIndex)
+					return false;
 			}
+
+			if (tzone < -1200 || tzone > 1400)
+				return false;
 
 			return true;
 		}
@@ -396,18 +400,16 @@ namespace MimeKit.Utils {
 			if (!TryGetTimeZone (tokens[n], text, out tzone))
 				tzone = 0;
 
-			while (tzone < -1400)
-				tzone += 2400;
-
-			while (tzone > 1400)
-				tzone -= 2400;
-
 			int minutes = tzone % 100;
 			int hours = tzone / 100;
 
 			var offset = new TimeSpan (hours, minutes, 0);
 
-			date = new DateTimeOffset (year, month, day, hour, minute, second, offset);
+			try {
+				date = new DateTimeOffset (year, month, day, hour, minute, second, offset);
+			} catch (ArgumentOutOfRangeException) {
+				return false;
+			}
 
 			return true;
 		}
@@ -460,8 +462,13 @@ namespace MimeKit.Utils {
 
 				if (tokens[i].IsNumeric) {
 					if (tokens[i].Length == 4) {
-						if (year == null && TryGetYear (tokens[i], text, out value))
-							year = value;
+						if (year == null) {
+							if (TryGetYear (tokens[i], text, out value))
+								year = value;
+						} else if (tzone == null) {
+							if (TryGetTimeZone (tokens[i], text, out value))
+								tzone = value;
+						}
 
 						continue;
 					}
@@ -512,7 +519,12 @@ namespace MimeKit.Utils {
 				offset = new TimeSpan (0);
 			}
 
-			date = new DateTimeOffset (year.Value, month.Value, day.Value, hour, minute, second, offset);
+			try {
+				date = new DateTimeOffset (year.Value, month.Value, day.Value, hour, minute, second, offset);
+			} catch (ArgumentOutOfRangeException) {
+				date = new DateTimeOffset ();
+				return false;
+			}
 
 			return true;
 		}

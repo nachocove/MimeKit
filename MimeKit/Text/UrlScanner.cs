@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -339,7 +339,7 @@ namespace MimeKit.Text {
 
 			index++;
 
-			return text[index] != '6' || text[index + 1] != ':';
+			return text[index] == '6' && text[index + 1] == ':';
 		}
 
 		// This needs to handle the following forms:
@@ -378,7 +378,7 @@ namespace MimeKit.Text {
 					if (!SkipIPv4Literal (text, endIndex, ref index))
 						return false;
 
-					break;
+					return compact ? colons < 6 : colons == 6;
 				}
 
 				int count = index - startIndex;
@@ -410,10 +410,7 @@ namespace MimeKit.Text {
 			if (colons < 2)
 				return false;
 
-			if (compact)
-				return colons < 6;
-
-			return colons < 7;
+			return compact ? colons < 7 : colons == 7;
 		}
 
 		static bool GetAddrspecStartIndex (UrlMatch match, char[] text, int startIndex, int matchIndex, int endIndex)

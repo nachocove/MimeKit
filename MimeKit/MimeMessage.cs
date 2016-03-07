@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -72,6 +72,7 @@ namespace MimeKit {
 		readonly Dictionary<string, InternetAddressList> addresses;
 		MessageImportance importance = MessageImportance.Normal;
 		MessagePriority priority = MessagePriority.Normal;
+		readonly RfcComplianceMode compliance;
 		readonly MessageIdList references;
 		MailboxAddress resentSender;
 		DateTimeOffset resentDate;
@@ -82,10 +83,13 @@ namespace MimeKit {
 		string inreplyto;
 		Version version;
 
+		// Note: this .ctor is used only by the MimeParser
 		internal MimeMessage (ParserOptions options, IEnumerable<Header> headers)
 		{
-			addresses = new Dictionary<string, InternetAddressList> (StringComparer.OrdinalIgnoreCase);
+			addresses = new Dictionary<string, InternetAddressList> (MimeUtils.OrdinalIgnoreCase);
 			Headers = new HeaderList (options);
+
+			compliance = RfcComplianceMode.Loose;
 
 			// initialize our address lists
 			foreach (var name in StandardAddressHeaders) {
@@ -111,8 +115,10 @@ namespace MimeKit {
 
 		internal MimeMessage (ParserOptions options)
 		{
-			addresses = new Dictionary<string, InternetAddressList> (StringComparer.OrdinalIgnoreCase);
+			addresses = new Dictionary<string, InternetAddressList> (MimeUtils.OrdinalIgnoreCase);
 			Headers = new HeaderList (options);
+
+			compliance = RfcComplianceMode.Strict;
 
 			// initialize our address lists
 			foreach (var name in StandardAddressHeaders) {
@@ -239,13 +245,29 @@ namespace MimeKit {
 		}
 
 		/// <summary>
+		/// Gets or sets the mbox marker.
+		/// </summary>
+		/// <remarks>
+		/// Set by the <see cref="MimeParser"/> when parsing attached message/rfc822 parts
+		/// so that the message/rfc822 part can be reserialized back to its original form.
+		/// </remarks>
+		/// <value>The mbox marker.</value>
+		internal byte[] MboxMarker {
+			get; set;
+		}
+
+		/// <summary>
 		/// Gets the list of headers.
 		/// </summary>
 		/// <remarks>
-		/// Represents the list of headers for a message. Typically, the headers of
+		/// <para>Represents the list of headers for a message. Typically, the headers of
 		/// a message will contain transmission headers such as From and To along
 		/// with metadata headers such as Subject and Date, but may include just
-		/// about anything.
+		/// about anything.</para>
+		/// <para><alert class="tip">To access any MIME headers other than
+		/// <see cref="HeaderId.MimeVersion"/>, you will need to access the
+		/// <see cref="MimeEntity.Headers"/> property of the <see cref="Body"/>.
+		/// </alert></para>
 		/// </remarks>
 		/// <value>The list of headers.</value>
 		public HeaderList Headers {
@@ -621,13 +643,13 @@ namespace MimeKit {
 				}
 
 				var buffer = Encoding.UTF8.GetBytes (value);
-				InternetAddress addr;
+				MailboxAddress mailbox;
 				int index = 0;
 
-				if (!InternetAddress.TryParse (Headers.Options, buffer, ref index, buffer.Length, false, out addr) || !(addr is MailboxAddress))
+				if (!MailboxAddress.TryParse (Headers.Options, buffer, ref index, buffer.Length, false, out mailbox))
 					throw new ArgumentException ("Invalid Message-Id format.", "value");
 
-				inreplyto = ((MailboxAddress) addr).Address;
+				inreplyto = mailbox.Address;
 
 				SetHeader ("In-Reply-To", "<" + inreplyto + ">");
 			}
@@ -659,13 +681,13 @@ namespace MimeKit {
 					return;
 
 				var buffer = Encoding.UTF8.GetBytes (value);
-				InternetAddress addr;
+				MailboxAddress mailbox;
 				int index = 0;
 
-				if (!InternetAddress.TryParse (Headers.Options, buffer, ref index, buffer.Length, false, out addr) || !(addr is MailboxAddress))
+				if (!MailboxAddress.TryParse (Headers.Options, buffer, ref index, buffer.Length, false, out mailbox))
 					throw new ArgumentException ("Invalid Message-Id format.", "value");
 
-				messageId = ((MailboxAddress) addr).Address;
+				messageId = mailbox.Address;
 
 				SetHeader ("Message-Id", "<" + messageId + ">");
 			}
@@ -697,13 +719,13 @@ namespace MimeKit {
 					return;
 
 				var buffer = Encoding.UTF8.GetBytes (value);
-				InternetAddress addr;
+				MailboxAddress mailbox;
 				int index = 0;
 
-				if (!InternetAddress.TryParse (Headers.Options, buffer, ref index, buffer.Length, false, out addr) || !(addr is MailboxAddress))
+				if (!MailboxAddress.TryParse (Headers.Options, buffer, ref index, buffer.Length, false, out mailbox))
 					throw new ArgumentException ("Invalid Resent-Message-Id format.", "value");
 
-				resentMessageId = ((MailboxAddress) addr).Address;
+				resentMessageId = mailbox.Address;
 
 				SetHeader ("Resent-Message-Id", "<" + resentMessageId + ">");
 			}
@@ -912,8 +934,8 @@ namespace MimeKit {
 		/// </summary>
 		/// <remarks>
 		/// <para>Returns a <see cref="System.String"/> that represents the current <see cref="MimeKit.MimeMessage"/>.</para>
-		/// <para>Note: In general, the string returned from this method SHOULD NOT be used for serializing the message
-		/// to disk. It is recommended that you use <see cref="WriteTo(Stream,CancellationToken)"/> instead.</para>
+		/// <para><alert class="warning">Note: In general, the string returned from this method SHOULD NOT be used for serializing
+		/// the message to disk. It is recommended that you use <see cref="WriteTo(Stream,CancellationToken)"/> instead.</alert></para>
 		/// </remarks>
 		/// <returns>A <see cref="System.String"/> that represents the current <see cref="MimeKit.MimeMessage"/>.</returns>
 		public override string ToString ()
@@ -962,15 +984,15 @@ namespace MimeKit {
 		/// Prepares the message for transport using the specified encoding constraints.
 		/// </remarks>
 		/// <param name="constraint">The encoding constraint.</param>
-		/// <param name="maxLineLength">The maximum allowable length for a line (not counting the CRLF). Must be between <c>72</c> and <c>998</c> (inclusive).</param>
+		/// <param name="maxLineLength">The maximum allowable length for a line (not counting the CRLF). Must be between <c>60</c> and <c>998</c> (inclusive).</param>
 		/// <exception cref="System.ArgumentOutOfRangeException">
-		/// <para><paramref name="maxLineLength"/> is not between <c>72</c> and <c>998</c> (inclusive).</para>
+		/// <para><paramref name="maxLineLength"/> is not between <c>60</c> and <c>998</c> (inclusive).</para>
 		/// <para>-or-</para>
 		/// <para><paramref name="constraint"/> is not a valid value.</para>
 		/// </exception>
 		public virtual void Prepare (EncodingConstraint constraint, int maxLineLength = 78)
 		{
-			if (maxLineLength < 72 || maxLineLength > 998)
+			if (maxLineLength < FormatOptions.MinimumLineLength || maxLineLength > FormatOptions.MaximumLineLength)
 				throw new ArgumentOutOfRangeException ("maxLineLength");
 
 			if (Body != null)
@@ -1005,7 +1027,7 @@ namespace MimeKit {
 			if (stream == null)
 				throw new ArgumentNullException ("stream");
 
-			if (version == null && Body != null && Body.Headers.Count > 0)
+			if (compliance == RfcComplianceMode.Strict && Body != null && Body.Headers.Count > 0 && !Headers.Contains (HeaderId.MimeVersion))
 				MimeVersion = new Version (1, 0);
 
 			if (Body != null) {
@@ -1034,10 +1056,12 @@ namespace MimeKit {
 				}
 
 				try {
+					Body.EnsureNewLine = compliance == RfcComplianceMode.Strict;
 					Body.Headers.Suppress = true;
 					Body.WriteTo (options, stream, cancellationToken);
 				} finally {
 					Body.Headers.Suppress = false;
+					Body.EnsureNewLine = false;
 				}
 			} else {
 				Headers.WriteTo (options, stream, cancellationToken);
@@ -1066,7 +1090,7 @@ namespace MimeKit {
 			WriteTo (FormatOptions.Default, stream, cancellationToken);
 		}
 
-#if !PORTABLE && !COREFX
+#if !PORTABLE
 		/// <summary>
 		/// Writes the message to the specified file.
 		/// </summary>
@@ -1303,23 +1327,31 @@ namespace MimeKit {
 		{
 			using (var stream = new DkimHashStream (signatureAlgorithm, maxLength)) {
 				using (var filtered = new FilteredStream (stream)) {
-					filtered.Add (options.CreateNewLineFilter ());
+					DkimBodyFilter dkim;
 
 					if (bodyCanonicalizationAlgorithm == DkimCanonicalizationAlgorithm.Relaxed)
-						filtered.Add (new DkimRelaxedBodyFilter ());
+						dkim = new DkimRelaxedBodyFilter ();
 					else
-						filtered.Add (new DkimSimpleBodyFilter ());
+						dkim = new DkimSimpleBodyFilter ();
+
+					filtered.Add (options.CreateNewLineFilter ());
+					filtered.Add (dkim);
 
 					if (Body != null) {
 						try {
+							Body.EnsureNewLine = compliance == RfcComplianceMode.Strict;
 							Body.Headers.Suppress = true;
 							Body.WriteTo (options, filtered, CancellationToken.None);
 						} finally {
 							Body.Headers.Suppress = false;
+							Body.EnsureNewLine = false;
 						}
 					}
 
 					filtered.Flush ();
+
+					if (!dkim.LastWasNewLine)
+						stream.Write (options.NewLineBytes, 0, options.NewLineBytes.Length);
 				}
 
 				return stream.GenerateHash ();
@@ -1421,9 +1453,7 @@ namespace MimeKit {
 			if (version == null && Body != null && Body.Headers.Count > 0)
 				MimeVersion = new Version (1, 0);
 
-			Prepare (EncodingConstraint.SevenBit, 78);
-
-			var t = DateTime.Now - DateUtils.UnixEpoch;
+			var t = DateTime.UtcNow - DateUtils.UnixEpoch;
 			var value = new StringBuilder ("v=1");
 			byte[] signature, hash;
 			Header dkim;
@@ -1707,6 +1737,7 @@ namespace MimeKit {
 		/// <remarks>
 		/// Verifies the specified DKIM-Signature header.
 		/// </remarks>
+		/// <returns><c>true</c> if the DKIM-Signature is valid; otherwise, <c>false</c>.</returns>
 		/// <param name="options">The formatting options.</param>
 		/// <param name="dkimSignature">The DKIM-Signature header.</param>
 		/// <param name="publicKeyLocator">The public key locator service.</param>
@@ -1727,7 +1758,7 @@ namespace MimeKit {
 		/// <exception cref="System.OperationCanceledException">
 		/// The operation was canceled via the cancellation token.
 		/// </exception>
-		bool Verify (FormatOptions options, Header dkimSignature, IDkimPublicKeyLocator publicKeyLocator, CancellationToken cancellationToken = default (CancellationToken))
+		public bool Verify (FormatOptions options, Header dkimSignature, IDkimPublicKeyLocator publicKeyLocator, CancellationToken cancellationToken = default (CancellationToken))
 		{
 			if (options == null)
 				throw new ArgumentNullException ("options");
@@ -1795,6 +1826,7 @@ namespace MimeKit {
 		/// <remarks>
 		/// Verifies the specified DKIM-Signature header.
 		/// </remarks>
+		/// <returns><c>true</c> if the DKIM-Signature is valid; otherwise, <c>false</c>.</returns>
 		/// <param name="dkimSignature">The DKIM-Signature header.</param>
 		/// <param name="publicKeyLocator">The public key locator service.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
@@ -2258,7 +2290,6 @@ namespace MimeKit {
 					continue;
 
 				var rawValue = header.RawValue;
-				InternetAddress address;
 				int index = 0;
 
 				switch (id) {
@@ -2286,14 +2317,12 @@ namespace MimeKit {
 						return;
 					break;
 				case HeaderId.ResentSender:
-					if (InternetAddress.TryParse (Headers.Options, rawValue, ref index, rawValue.Length, false, out address))
-						resentSender = address as MailboxAddress;
+					MailboxAddress.TryParse (Headers.Options, rawValue, ref index, rawValue.Length, false, out resentSender);
 					if (resentSender != null)
 						return;
 					break;
 				case HeaderId.Sender:
-					if (InternetAddress.TryParse (Headers.Options, rawValue, ref index, rawValue.Length, false, out address))
-						sender = address as MailboxAddress;
+					MailboxAddress.TryParse (Headers.Options, rawValue, ref index, rawValue.Length, false, out sender);
 					if (sender != null)
 						return;
 					break;
@@ -2326,7 +2355,6 @@ namespace MimeKit {
 		void HeadersChanged (object o, HeaderListChangedEventArgs e)
 		{
 			InternetAddressList list;
-			InternetAddress address;
 			byte[] rawValue;
 			int index = 0;
 
@@ -2359,12 +2387,10 @@ namespace MimeKit {
 					messageId = MimeUtils.ParseMessageId (rawValue, 0, rawValue.Length);
 					break;
 				case HeaderId.ResentSender:
-					if (InternetAddress.TryParse (Headers.Options, rawValue, ref index, rawValue.Length, false, out address))
-						resentSender = address as MailboxAddress;
+					MailboxAddress.TryParse (Headers.Options, rawValue, ref index, rawValue.Length, false, out resentSender);
 					break;
 				case HeaderId.Sender:
-					if (InternetAddress.TryParse (Headers.Options, rawValue, ref index, rawValue.Length, false, out address))
-						sender = address as MailboxAddress;
+					MailboxAddress.TryParse (Headers.Options, rawValue, ref index, rawValue.Length, false, out sender);
 					break;
 				case HeaderId.ResentDate:
 					DateUtils.TryParse (rawValue, 0, rawValue.Length, out resentDate);
@@ -2408,6 +2434,7 @@ namespace MimeKit {
 				references.Clear ();
 				references.Changed += ReferencesChanged;
 
+				resentDate = date = DateTimeOffset.MinValue;
 				importance = MessageImportance.Normal;
 				priority = MessagePriority.Normal;
 				resentMessageId = null;
@@ -2556,7 +2583,7 @@ namespace MimeKit {
 			return Load (ParserOptions.Default, stream, false, cancellationToken);
 		}
 
-#if !PORTABLE && !COREFX
+#if !PORTABLE
 		/// <summary>
 		/// Load a <see cref="MimeMessage"/> from the specified file.
 		/// </summary>
@@ -2654,8 +2681,14 @@ namespace MimeKit {
 		static MimePart GetMimePart (AttachmentBase item)
 		{
 			var mimeType = item.ContentType.ToString ();
-			var part = new MimePart (ContentType.Parse (mimeType));
+			var contentType = ContentType.Parse (mimeType);
 			var attachment = item as Attachment;
+			MimePart part;
+
+			if (contentType.MediaType.Equals ("text", StringComparison.OrdinalIgnoreCase))
+				part = new TextPart (contentType);
+			else
+				part = new MimePart (contentType);
 
 			if (attachment != null) {
 				var disposition = attachment.ContentDisposition.ToString ();
@@ -2672,6 +2705,9 @@ namespace MimeKit {
 			case System.Net.Mime.TransferEncoding.SevenBit:
 				part.ContentTransferEncoding = ContentEncoding.SevenBit;
 				break;
+			//case System.Net.Mime.TransferEncoding.EightBit:
+			//	part.ContentTransferEncoding = ContentEncoding.EightBit;
+			//	break;
 			}
 
 			if (item.ContentId != null)
@@ -2735,6 +2771,12 @@ namespace MimeKit {
 				msg.Subject = message.Subject ?? string.Empty;
 
 			switch (message.Priority) {
+			case MailPriority.Normal:
+				msg.Headers.RemoveAll (HeaderId.XMSMailPriority);
+				msg.Headers.RemoveAll (HeaderId.Importance);
+				msg.Headers.RemoveAll (HeaderId.XPriority);
+				msg.Headers.RemoveAll (HeaderId.Priority);
+				break;
 			case MailPriority.High:
 				msg.Headers.Replace (HeaderId.Priority, "urgent");
 				msg.Headers.Replace (HeaderId.Importance, "high");
@@ -2754,7 +2796,7 @@ namespace MimeKit {
 			}
 
 			if (message.AlternateViews.Count > 0) {
-				var alternative = new Multipart ("alternative");
+				var alternative = new MultipartAlternative ();
 
 				if (body != null)
 					alternative.Add (body);
@@ -2767,7 +2809,7 @@ namespace MimeKit {
 
 					if (view.LinkedResources.Count > 0) {
 						var type = part.ContentType.MediaType + "/" + part.ContentType.MediaSubtype;
-						var related = new Multipart ("related");
+						var related = new MultipartRelated ();
 
 						related.ContentType.Parameters.Add ("type", type);
 

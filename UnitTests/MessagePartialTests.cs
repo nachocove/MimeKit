@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2014 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -67,7 +67,7 @@ namespace UnitTests {
 
 			var part = multipart[1] as MimePart;
 			Assert.IsNotNull (part, "Second part is null or not a MimePart");
-			Assert.IsTrue (part.ContentType.Matches ("image", "jpeg"), "Attachment is not an image/jpeg");
+			Assert.IsTrue (part.ContentType.IsMimeType ("image", "jpeg"), "Attachment is not an image/jpeg");
 			Assert.AreEqual ("2377h003.jpg", part.FileName, "Attachment filename is not the expected value");
 		}
 	}

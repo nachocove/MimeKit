@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -190,6 +190,27 @@ namespace MimeKit {
 				throw new ArgumentNullException ("messageId");
 
 			references.Add (ValidateMessageId (messageId));
+			OnChanged ();
+		}
+
+		/// <summary>
+		/// Add a collection of Message-Id items.
+		/// </summary>
+		/// <remarks>
+		/// Adds a collection of Message-Id items to append to the list.
+		/// </remarks>
+		/// <param name="items">The Message-Id items to add.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="items"/> is <c>null</c>.
+		/// </exception>
+		public void AddRange (IEnumerable<string> items)
+		{
+			if (items == null)
+				throw new ArgumentNullException ("items");
+
+			foreach (var msgid in items)
+				references.Add (ValidateMessageId (msgid));
+
 			OnChanged ();
 		}
 

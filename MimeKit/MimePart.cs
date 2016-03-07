@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -300,7 +300,7 @@ namespace MimeKit {
 			set {
 				if (value != null) {
 					if (ContentDisposition == null)
-						ContentDisposition = new ContentDisposition ();
+						ContentDisposition = new ContentDisposition (ContentDisposition.Attachment);
 					ContentDisposition.FileName = value;
 				} else if (ContentDisposition != null) {
 					ContentDisposition.FileName = value;
@@ -325,12 +325,12 @@ namespace MimeKit {
 		/// Dispatches to the specific visit method for this MIME entity.
 		/// </summary>
 		/// <remarks>
-		/// This default implementation for <see cref="MimeKit.MimeEntity"/> nodes
-		/// calls <see cref="MimeKit.MimeVisitor.VisitMimeEntity"/>. Override this
+		/// This default implementation for <see cref="MimeKit.MimePart"/> nodes
+		/// calls <see cref="MimeKit.MimeVisitor.VisitMimePart"/>. Override this
 		/// method to call into a more specific method on a derived visitor class
 		/// of the <see cref="MimeKit.MimeVisitor"/> class. However, it should still
 		/// support unknown visitors by calling
-		/// <see cref="MimeKit.MimeVisitor.VisitMimeEntity"/>.
+		/// <see cref="MimeKit.MimeVisitor.VisitMimePart"/>.
 		/// </remarks>
 		/// <param name="visitor">The visitor.</param>
 		/// <exception cref="System.ArgumentNullException">
@@ -426,7 +426,7 @@ namespace MimeKit {
 				byte[] checksum;
 
 				using (var filtered = new FilteredStream (stream)) {
-					if (ContentType.Matches ("text", "*"))
+					if (ContentType.IsMimeType ("text", "*"))
 						filtered.Add (new Unix2DosFilter ());
 
 					using (var md5 = MD5.Create ())
@@ -490,15 +490,15 @@ namespace MimeKit {
 		/// Prepares the MIME entity for transport using the specified encoding constraints.
 		/// </remarks>
 		/// <param name="constraint">The encoding constraint.</param>
-		/// <param name="maxLineLength">The maximum allowable length for a line (not counting the CRLF). Must be between <c>72</c> and <c>998</c> (inclusive).</param>
+		/// <param name="maxLineLength">The maximum number of octets allowed per line (not counting the CRLF). Must be between <c>60</c> and <c>998</c> (inclusive).</param>
 		/// <exception cref="System.ArgumentOutOfRangeException">
-		/// <para><paramref name="maxLineLength"/> is not between <c>72</c> and <c>998</c> (inclusive).</para>
+		/// <para><paramref name="maxLineLength"/> is not between <c>60</c> and <c>998</c> (inclusive).</para>
 		/// <para>-or-</para>
 		/// <para><paramref name="constraint"/> is not a valid value.</para>
 		/// </exception>
 		public override void Prepare (EncodingConstraint constraint, int maxLineLength = 78)
 		{
-			if (maxLineLength < 72 || maxLineLength > 998)
+			if (maxLineLength < FormatOptions.MinimumLineLength || maxLineLength > FormatOptions.MaximumLineLength)
 				throw new ArgumentOutOfRangeException ("maxLineLength");
 
 			switch (ContentTransferEncoding) {
@@ -531,6 +531,7 @@ namespace MimeKit {
 		/// </remarks>
 		/// <param name="options">The formatting options.</param>
 		/// <param name="stream">The output stream.</param>
+		/// <param name="contentOnly"><c>true</c> if only the content should be written; otherwise, <c>false</c>.</param>
 		/// <param name="cancellationToken">A cancellation token.</param>
 		/// <exception cref="System.ArgumentNullException">
 		/// <para><paramref name="options"/> is <c>null</c>.</para>
@@ -543,9 +544,9 @@ namespace MimeKit {
 		/// <exception cref="System.IO.IOException">
 		/// An I/O error occurred.
 		/// </exception>
-		public override void WriteTo (FormatOptions options, Stream stream, CancellationToken cancellationToken = default (CancellationToken))
+		public override void WriteTo (FormatOptions options, Stream stream, bool contentOnly, CancellationToken cancellationToken = default (CancellationToken))
 		{
-			base.WriteTo (options, stream, cancellationToken);
+			base.WriteTo (options, stream, contentOnly, cancellationToken);
 
 			if (ContentObject == null)
 				return;
@@ -572,7 +573,7 @@ namespace MimeKit {
 					filtered.Add (EncoderFilter.Create (encoding));
 
 					if (encoding != ContentEncoding.Binary)
-						filtered.Add (options.CreateNewLineFilter ());
+						filtered.Add (options.CreateNewLineFilter (true));
 
 					ContentObject.DecodeTo (filtered, cancellationToken);
 					filtered.Flush (cancellationToken);
@@ -592,7 +593,9 @@ namespace MimeKit {
 				}
 			} else if (encoding != ContentEncoding.Binary) {
 				using (var filtered = new FilteredStream (stream)) {
-					filtered.Add (options.CreateNewLineFilter ());
+					// Note: if we are writing the top-level MimePart, make sure it ends with a new-line so that
+					// MimeMessage.WriteTo() *always* ends with a new-line.
+					filtered.Add (options.CreateNewLineFilter (EnsureNewLine));
 					ContentObject.WriteTo (filtered, cancellationToken);
 					filtered.Flush (cancellationToken);
 				}

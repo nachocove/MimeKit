@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -306,6 +306,21 @@ namespace MimeKit {
 		protected internal virtual void VisitMultipartRelated (MultipartRelated related)
 		{
 			VisitMultipart (related);
+		}
+
+		/// <summary>
+		/// Visit the multipart/report MIME entity.
+		/// </summary>
+		/// <remarks>
+		/// Visits the multipart/report MIME entity.
+		/// </remarks>
+		/// <example>
+		/// <code language="c#" source="Examples\MimeVisitorExamples.cs" region="HtmlPreviewVisitor" />
+		/// </example>
+		/// <param name="report">The multipart/report MIME entity.</param>
+		protected internal virtual void VisitMultipartReport (MultipartReport report)
+		{
+			VisitMultipart (report);
 		}
 
 #if ENABLE_CRYPTO

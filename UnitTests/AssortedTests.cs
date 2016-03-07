@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2014 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -37,44 +37,6 @@ namespace UnitTests {
 	[TestFixture]
 	public class AssortedTests
 	{
-		[Test]
-		public void TestMultiLinePreamble ()
-		{
-			var multipart = new Multipart ("alternative");
-			var multiline = "This is a part in a (multipart) message generated with the MimeKit library.\n\n" + 
-			                "All of the parts of this message are identical, however they've been encoded " +
-			                "for transport using different methods.\n";
-			var expected = "This is a part in a (multipart) message generated with the MimeKit library.\n\n" +
-			               "All of the parts of this message are identical, however they've been encoded\n" +
-			               "for transport using different methods.\n";
-
-			if (FormatOptions.Default.NewLineFormat != NewLineFormat.Unix)
-				expected = expected.Replace ("\n", "\r\n");
-
-			multipart.Preamble = multiline;
-
-			Assert.AreEqual (expected, multipart.Preamble);
-		}
-
-		[Test]
-		public void TestLongPreamble ()
-		{
-			var multipart = new Multipart ("alternative");
-			var multiline = "This is a part in a (multipart) message generated with the MimeKit library. " + 
-			                "All of the parts of this message are identical, however they've been encoded " +
-			                "for transport using different methods.";
-			var expected = "This is a part in a (multipart) message generated with the MimeKit library.\n" +
-			               "All of the parts of this message are identical, however they've been encoded\n" +
-			               "for transport using different methods.\n";
-
-			if (FormatOptions.Default.NewLineFormat != NewLineFormat.Unix)
-				expected = expected.Replace ("\n", "\r\n");
-
-			multipart.Preamble = multiline;
-
-			Assert.AreEqual (expected, multipart.Preamble);
-		}
-
 		[Test]
 		public void TestParsingObsoleteInReplyToSyntax ()
 		{

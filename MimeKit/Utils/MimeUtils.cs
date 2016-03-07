@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -47,6 +47,14 @@ namespace MimeKit.Utils {
 #endif
 		const string base36 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
+		/// <summary>
+		/// A string comparer that performs a case-insensitive ordinal string comparison.
+		/// </summary>
+		/// <remarks>
+		/// A string comparer that performs a case-insensitive ordinal string comparison.
+		/// </remarks>
+		public static readonly IEqualityComparer<string> OrdinalIgnoreCase = new OptimizedOrdinalIgnoreCaseComparer ();
+
 		internal static void GetRandomBytes (byte[] buffer)
 		{
 #if NET_3_5
@@ -73,10 +81,16 @@ namespace MimeKit.Utils {
 		/// <exception cref="System.ArgumentNullException">
 		/// <paramref name="domain"/> is <c>null</c>.
 		/// </exception>
+		/// <exception cref="System.ArgumentException">
+		/// <paramref name="domain"/> is invalid.
+		/// </exception>
 		public static string GenerateMessageId (string domain)
 		{
 			if (domain == null)
 				throw new ArgumentNullException ("domain");
+
+			if (domain.Length == 0)
+				throw new ArgumentException ("The domain is invalid.", "domain");
 
 			ulong value = (ulong) DateTime.Now.Ticks;
 			var id = new StringBuilder ();
@@ -114,7 +128,7 @@ namespace MimeKit.Utils {
 		/// <returns>The message identifier.</returns>
 		public static string GenerateMessageId ()
 		{
-#if PORTABLE
+#if PORTABLE || COREFX
 			return GenerateMessageId ("localhost.localdomain");
 #else
 			var properties = IPGlobalProperties.GetIPGlobalProperties ();
@@ -145,19 +159,12 @@ namespace MimeKit.Utils {
 		/// </exception>
 		public static IEnumerable<string> EnumerateReferences (byte[] buffer, int startIndex, int length)
 		{
+			ParseUtils.ValidateArguments (buffer, startIndex, length);
+
 			byte[] sentinels = { (byte) '>' };
 			int endIndex = startIndex + length;
 			int index = startIndex;
 			string msgid;
-
-			if (buffer == null)
-				throw new ArgumentNullException ("buffer");
-
-			if (startIndex < 0 || startIndex > buffer.Length)
-				throw new ArgumentOutOfRangeException ("startIndex");
-
-			if (length < 0 || length > (buffer.Length - startIndex))
-				throw new ArgumentOutOfRangeException ("length");
 
 			do {
 				if (!ParseUtils.SkipCommentsAndWhiteSpace (buffer, ref index, endIndex, false))
@@ -285,19 +292,12 @@ namespace MimeKit.Utils {
 		/// </exception>
 		public static string ParseMessageId (byte[] buffer, int startIndex, int length)
 		{
+			ParseUtils.ValidateArguments (buffer, startIndex, length);
+
 			byte[] sentinels = { (byte) '>' };
 			int endIndex = startIndex + length;
 			int index = startIndex;
 			string msgid;
-
-			if (buffer == null)
-				throw new ArgumentNullException ("buffer");
-
-			if (startIndex < 0 || startIndex > buffer.Length)
-				throw new ArgumentOutOfRangeException ("startIndex");
-
-			if (length < 0 || length > (buffer.Length - startIndex))
-				throw new ArgumentOutOfRangeException ("length");
 
 			if (!ParseUtils.SkipCommentsAndWhiteSpace (buffer, ref index, endIndex, false))
 				return null;
@@ -409,14 +409,7 @@ namespace MimeKit.Utils {
 		/// </exception>
 		public static bool TryParse (byte[] buffer, int startIndex, int length, out Version version)
 		{
-			if (buffer == null)
-				throw new ArgumentNullException ("buffer");
-
-			if (startIndex < 0 || startIndex > buffer.Length)
-				throw new ArgumentOutOfRangeException ("startIndex");
-
-			if (length < 0 || length > (buffer.Length - startIndex))
-				throw new ArgumentOutOfRangeException ("length");
+			ParseUtils.ValidateArguments (buffer, startIndex, length);
 
 			var values = new List<int> ();
 			int endIndex = startIndex + length;

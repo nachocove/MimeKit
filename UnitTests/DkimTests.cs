@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -69,7 +69,7 @@ namespace UnitTests
 
 		static DkimSigner CreateSigner (DkimSignatureAlgorithm algorithm)
 		{
-			return new DkimSigner (DkimKeys.Private, "example.com", "1433868189.example") {
+			return new DkimSigner (Path.Combine ("..", "..", "TestData", "dkim", "example.pem"), "example.com", "1433868189.example") {
 				SignatureAlgorithm = algorithm,
 				AgentOrUserIdentifier = "@eng.example.com",
 				QueryMethod = "dns/txt",
@@ -157,6 +157,40 @@ namespace UnitTests
 			Assert.IsTrue (message.Verify (message.Headers[index], new DummyPublicKeyLocator (key)), "Failed to verify GMail signature.");
 		}
 
+		[Test]
+		public void TestVerifyGoogleMultipartRelatedDkimSignature ()
+		{
+			var message = MimeMessage.Load (Path.Combine ("..", "..", "TestData", "dkim", "related.msg"));
+			int index = message.Headers.IndexOf (HeaderId.DkimSignature);
+			AsymmetricKeyParameter key;
+
+			// Note: you can use http://dkimcore.org/tools/dkimrecordcheck.html to get public keys manually
+			using (var stream = new StreamReader (Path.Combine ("..", "..", "TestData", "dkim", "gmail.pub"))) {
+				var reader = new PemReader (stream);
+
+				key = reader.ReadObject () as AsymmetricKeyParameter;
+			}
+
+			Assert.IsTrue (message.Verify (message.Headers[index], new DummyPublicKeyLocator (key)), "Failed to verify GMail signature.");
+		}
+
+		[Test]
+		public void TestVerifyGoogleMultipartWithoutEndBoundaryDkimSignature ()
+		{
+			var message = MimeMessage.Load (Path.Combine ("..", "..", "TestData", "dkim", "multipart-no-end-boundary.msg"));
+			int index = message.Headers.IndexOf (HeaderId.DkimSignature);
+			AsymmetricKeyParameter key;
+
+			// Note: you can use http://dkimcore.org/tools/dkimrecordcheck.html to get public keys manually
+			using (var stream = new StreamReader (Path.Combine ("..", "..", "TestData", "dkim", "gmail.pub"))) {
+				var reader = new PemReader (stream);
+
+				key = reader.ReadObject () as AsymmetricKeyParameter;
+			}
+
+			Assert.IsTrue (message.Verify (message.Headers[index], new DummyPublicKeyLocator (key)), "Failed to verify GMail signature.");
+		}
+
 		static void TestDkimSignVerify (MimeMessage message, DkimSignatureAlgorithm signatureAlgorithm, DkimCanonicalizationAlgorithm headerAlgorithm, DkimCanonicalizationAlgorithm bodyAlgorithm)
 		{
 			var headers = new HeaderId[] { HeaderId.From, HeaderId.Subject, HeaderId.Date };
@@ -172,6 +206,7 @@ namespace UnitTests
 		}
 
 		[Test]
+		[Ignore]
 		public void TestDkimSignVerifyJwzMbox ()
 		{
 			using (var stream = File.OpenRead ("../../TestData/mbox/jwz.mbox.txt")) {

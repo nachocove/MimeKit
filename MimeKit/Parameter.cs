@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc.
+// Copyright (c) 2013-2016 Xamarin Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -45,6 +45,8 @@ namespace MimeKit {
 	/// </remarks>
 	public class Parameter
 	{
+		ParameterEncodingMethod encodingMethod;
+		Encoding encoding;
 		string text;
 
 		/// <summary>
@@ -61,7 +63,7 @@ namespace MimeKit {
 		/// <para><paramref name="value"/> is <c>null</c>.</para>
 		/// </exception>
 		/// <exception cref="System.ArgumentException">
-		/// The <paramref name="name"/> contains illegal characters.
+		/// <paramref name="name"/> contains illegal characters.
 		/// </exception>
 		public Parameter (string name, string value)
 		{
@@ -79,13 +81,97 @@ namespace MimeKit {
 			if (value == null)
 				throw new ArgumentNullException ("value");
 
-			Name = name;
 			Value = value;
+			Name = name;
 		}
 
-		static bool IsAttr (byte c)
+		/// <summary>
+		/// Initializes a new instance of the <see cref="Parameter"/> class.
+		/// </summary>
+		/// <remarks>
+		/// Creates a new parameter with the specified name and value.
+		/// </remarks>
+		/// <param name="encoding">The character encoding.</param>
+		/// <param name="name">The parameter name.</param>
+		/// <param name="value">The parameter value.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <para><paramref name="encoding"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="name"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="value"/> is <c>null</c>.</para>
+		/// </exception>
+		/// <exception cref="System.ArgumentException">
+		/// <paramref name="name"/> contains illegal characters.
+		/// </exception>
+		public Parameter (Encoding encoding, string name, string value)
 		{
-			return c.IsAttr ();
+			if (encoding == null)
+				throw new ArgumentNullException ("encoding");
+
+			if (name == null)
+				throw new ArgumentNullException ("name");
+
+			if (name.Length == 0)
+				throw new ArgumentException ("Parameter names are not allowed to be empty.", "name");
+
+			for (int i = 0; i < name.Length; i++) {
+				if (name[i] > 127 || !IsAttr ((byte) name[i]))
+					throw new ArgumentException ("Illegal characters in parameter name.", "name");
+			}
+
+			if (value == null)
+				throw new ArgumentNullException ("value");
+
+			Encoding = encoding;
+			Value = value;
+			Name = name;
+		}
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="Parameter"/> class.
+		/// </summary>
+		/// <remarks>
+		/// Creates a new parameter with the specified name and value.
+		/// </remarks>
+		/// <param name="charset">The character encoding.</param>
+		/// <param name="name">The parameter name.</param>
+		/// <param name="value">The parameter value.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <para><paramref name="charset"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="name"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="value"/> is <c>null</c>.</para>
+		/// </exception>
+		/// <exception cref="System.ArgumentException">
+		/// <paramref name="name"/> contains illegal characters.
+		/// </exception>
+		/// <exception cref="System.NotSupportedException">
+		/// <paramref name="charset"/> is not supported.
+		/// </exception>
+		public Parameter (string charset, string name, string value)
+		{
+			if (charset == null)
+				throw new ArgumentNullException ("charset");
+
+			if (name == null)
+				throw new ArgumentNullException ("name");
+
+			if (name.Length == 0)
+				throw new ArgumentException ("Parameter names are not allowed to be empty.", "name");
+
+			for (int i = 0; i < name.Length; i++) {
+				if (name[i] > 127 || !IsAttr ((byte) name[i]))
+					throw new ArgumentException ("Illegal characters in parameter name.", "name");
+			}
+
+			if (value == null)
+				throw new ArgumentNullException ("value");
+
+			Encoding = CharsetUtils.GetEncoding (charset);
+			Value = value;
+			Name = name;
 		}
 
 		/// <summary>
@@ -97,6 +183,61 @@ namespace MimeKit {
 		/// <value>The parameter name.</value>
 		public string Name {
 			get; private set;
+		}
+
+		/// <summary>
+		/// Gets or sets the parameter value character encoding.
+		/// </summary>
+		/// <remarks>
+		/// Gets or sets the parameter value character encoding.
+		/// </remarks>
+		/// <value>The character encoding.</value>
+		public Encoding Encoding {
+			get { return encoding ?? CharsetUtils.UTF8; }
+			set {
+				if (encoding == value)
+					return;
+
+				encoding = value;
+				OnChanged ();
+			}
+		}
+
+		/// <summary>
+		/// Gets or sets the parameter encoding method to use.
+		/// </summary>
+		/// <remarks>
+		/// <para>Gets or sets the parameter encoding method to use.</para>
+		/// <para>The MIME specifications specify that the proper method for encoding Content-Type
+		/// and Content-Disposition parameter values is the method described in
+		/// <a href="https://tools.ietf.org/html/rfc2231">rfc2231</a>. However, it is common for
+		/// some older email clients to improperly encode using the method described in
+		/// <a href="https://tools.ietf.org/html/rfc2047">rfc2047</a> instead.</para>
+		/// <para>If set to <see cref="ParameterEncodingMethod.Default"/>, the encoding
+		/// method used will default to the value set on the <see cref="FormatOptions"/>.</para>
+		/// </remarks>
+		/// <value>The encoding method.</value>
+		/// <exception cref="System.ArgumentOutOfRangeException">
+		/// <paramref name="value"/> is not a valid value.
+		/// </exception>
+		public ParameterEncodingMethod EncodingMethod {
+			get { return encodingMethod; }
+			set {
+				if (encodingMethod == value)
+					return;
+
+				switch (value) {
+				case ParameterEncodingMethod.Default:
+				case ParameterEncodingMethod.Rfc2047:
+				case ParameterEncodingMethod.Rfc2231:
+					encodingMethod = value;
+					break;
+				default:
+					throw new ArgumentOutOfRangeException ("value");
+				}
+
+				OnChanged ();
+			}
 		}
 
 		/// <summary>
@@ -123,34 +264,61 @@ namespace MimeKit {
 			}
 		}
 
+		static bool IsAttr (byte c)
+		{
+			return c.IsAttr ();
+		}
+
+		static bool IsCtrl (char c)
+		{
+			return ((byte) c).IsCtrl ();
+		}
+
 		enum EncodeMethod {
 			None,
 			Quote,
-			Rfc2184
+			Rfc2047,
+			Rfc2231
 		}
 
-		static EncodeMethod GetEncodeMethod (FormatOptions options, string name, string value, out string quoted)
+		EncodeMethod GetEncodeMethod (FormatOptions options, string name, string value, out string quoted)
 		{
 			var method = EncodeMethod.None;
+			EncodeMethod encode;
+
+			switch (encodingMethod) {
+			default:
+				if (options.ParameterEncodingMethod == ParameterEncodingMethod.Rfc2231)
+					encode = EncodeMethod.Rfc2231;
+				else
+					encode = EncodeMethod.Rfc2047;
+				break;
+			case ParameterEncodingMethod.Rfc2231:
+				encode = EncodeMethod.Rfc2231;
+				break;
+			case ParameterEncodingMethod.Rfc2047:
+				encode = EncodeMethod.Rfc2047;
+				break;
+			}
 
 			quoted = null;
 
 			if (name.Length + 1 + value.Length >= options.MaxLineLength)
-				return EncodeMethod.Rfc2184;
+				return encode;
 
 			for (int i = 0; i < value.Length; i++) {
 				if (value[i] < 128) {
 					var c = (byte) value[i];
 
 					if (c.IsCtrl ())
-						return EncodeMethod.Rfc2184;
+						return encode;
 
 					if (!c.IsAttr ())
 						method = EncodeMethod.Quote;
 				} else if (options.International) {
 					method = EncodeMethod.Quote;
 				} else {
-					return EncodeMethod.Rfc2184;
+					return encode;
 				}
 			}
 
@@ -158,7 +326,7 @@ namespace MimeKit {
 				quoted = MimeUtils.Quote (value);
 
 				if (name.Length + 1 + quoted.Length >= options.MaxLineLength)
-					return EncodeMethod.Rfc2184;
+					return encode;
 			}
 
 			return method;
@@ -173,14 +341,14 @@ namespace MimeKit {
 					var c = (byte) value[i];
 
 					if (c.IsCtrl ())
-						return EncodeMethod.Rfc2184;
+						return EncodeMethod.Rfc2231;
 
 					if (!c.IsAttr ())
 						method = EncodeMethod.Quote;
 				} else if (options.International) {
 					method = EncodeMethod.Quote;
 				} else {
-					return EncodeMethod.Rfc2184;
+					return EncodeMethod.Rfc2231;
 				}
 			}
 
@@ -193,18 +361,13 @@ namespace MimeKit {
 
 			for (int i = 0; i < length; i++) {
 				if (value[i] >= 127 || value[i].IsCtrl ())
-					return EncodeMethod.Rfc2184;
+					return EncodeMethod.Rfc2231;
 
 				if (!value[i].IsAttr ())
 					method = EncodeMethod.Quote;
 			}
 
 			return method;
-		}
-
-		static bool IsCtrl (char c)
-		{
-			return ((byte) c).IsCtrl ();
 		}
 
 		static Encoding GetBestEncoding (string value, Encoding defaultEncoding)
@@ -229,8 +392,7 @@ namespace MimeKit {
 			}
 		}
 
-		static bool GetNextValue (FormatOptions options, string charset, Encoder encoder, HexEncoder hex, char[] chars, ref int index,
-		                          ref byte[] bytes, ref byte[] encoded, int maxLength, out string value)
+		static bool Rfc2231GetNextValue (FormatOptions options, string charset, Encoder encoder, HexEncoder hex, char[] chars, ref int index, ref byte[] bytes, ref byte[] encoded, int maxLength, out string value)
 		{
 			int length = chars.Length - index;
 
@@ -316,35 +478,9 @@ namespace MimeKit {
 			} while (true);
 		}
 
-		internal void Encode (FormatOptions options, StringBuilder builder, ref int lineLength, Encoding encoding)
+		void EncodeRfc2231 (FormatOptions options, StringBuilder builder, ref int lineLength, Encoding headerEncoding)
 		{
-			string quoted;
-
-			var method = GetEncodeMethod (options, Name, Value, out quoted);
-			if (method == EncodeMethod.None)
-				quoted = Value;
-
-			if (method != EncodeMethod.Rfc2184) {
-				builder.Append (';');
-				lineLength++;
-
-				if (lineLength + 1 + Name.Length + 1 + quoted.Length >= options.MaxLineLength) {
-					builder.Append (options.NewLine);
-					builder.Append ('\t');
-					lineLength = 1;
-				} else {
-					builder.Append (' ');
-					lineLength++;
-				}
-
-				lineLength += Name.Length + 1 + quoted.Length;
-				builder.Append (Name);
-				builder.Append ('=');
-				builder.Append (quoted);
-				return;
-			}
-
-			var bestEncoding = options.International ? Encoding.UTF8 : GetBestEncoding (Value, encoding);
+			var bestEncoding = options.International ? CharsetUtils.UTF8 : GetBestEncoding (Value, encoding ?? headerEncoding);
 			int maxLength = options.MaxLineLength - (Name.Length + 6);
 			var charset = CharsetUtils.GetMimeCharset (bestEncoding);
 			var encoder = (Encoder) bestEncoding.GetEncoder ();
@@ -361,7 +497,7 @@ namespace MimeKit {
 				builder.Append (';');
 				lineLength++;
 
-				encoded = GetNextValue (options, charset, encoder, hex, chars, ref index, ref bytes, ref hexbuf, maxLength, out value);
+				encoded = Rfc2231GetNextValue (options, charset, encoder, hex, chars, ref index, ref bytes, ref hexbuf, maxLength, out value);
 				length = Name.Length + (encoded ? 1 : 0) + 1 + value.Length;
 
 				if (i == 0 && index == chars.Length) {
@@ -400,6 +536,160 @@ namespace MimeKit {
 				lineLength += length;
 				i++;
 			} while (index < chars.Length);
+		}
+
+		static int EstimateEncodedWordLength (string charset, int byteCount, int encodeCount)
+		{
+			int length = charset.Length + 7;
+
+			if ((double) encodeCount < (byteCount * 0.17)) {
+				// quoted-printable encoding
+				return length + (byteCount - encodeCount) + (encodeCount * 3);
+			}
+
+			// base64 encoding
+			return length + ((byteCount + 2) / 3) * 4;
+		}
+
+		static bool ExceedsMaxWordLength (string charset, int byteCount, int encodeCount, int maxLength)
+		{
+			int length = EstimateEncodedWordLength (charset, byteCount, encodeCount);
+
+			return length + 1 >= maxLength;
+		}
+
+		static int Rfc2047EncodeNextChunk (StringBuilder str, string text, ref int index, Encoding encoding, string charset, Encoder encoder, int maxLength)
+		{
+			int byteCount = 0, charCount = 0, encodeCount = 0;
+			var buffer = new char[2];
+			int startIndex = index;
+			int nchars, n;
+			char c;
+
+			while (index < text.Length) {
+				c = text[index++];
+
+				if (c < 127) {
+					if (IsCtrl (c) || c == '"' || c == '\\')
+						encodeCount++;
+
+					byteCount++;
+					charCount++;
+					nchars = 1;
+					n = 1;
+				} else if (c < 256) {
+					// iso-8859-1
+					encodeCount++;
+					byteCount++;
+					charCount++;
+					nchars = 1;
+					n = 1;
+				} else {
+					if (char.IsSurrogatePair (text, index - 1)) {
+						buffer[1] = text[index++];
+						nchars = 2;
+					} else {
+						nchars = 1;
+					}
+
+					buffer[0] = c;
+
+					try {
+						n = encoder.GetByteCount (buffer, 0, nchars, true);
+					} catch {
+						n = 3;
+					}
+
+					charCount += nchars;
+					encodeCount += n;
+					byteCount += n;
+				}
+
+				if (ExceedsMaxWordLength (charset, byteCount, encodeCount, maxLength)) {
+					// restore our previous state
+					charCount -= nchars;
+					index -= nchars;
+					byteCount -= n;
+					break;
+				}
+			}
+
+			return Rfc2047.AppendEncodedWord (str, encoding, text, startIndex, charCount, QEncodeMode.Text);
+		}
+
+		void EncodeRfc2047 (FormatOptions options, StringBuilder builder, ref int lineLength, Encoding headerEncoding)
+		{
+			var bestEncoding = options.International ? CharsetUtils.UTF8 : GetBestEncoding (Value, encoding ?? headerEncoding);
+			var charset = CharsetUtils.GetMimeCharset (bestEncoding);
+			var encoder = (Encoder) bestEncoding.GetEncoder ();
+			int index = 0;
+			int length;
+
+			builder.Append (';');
+			lineLength++;
+
+			// account for: <SPACE> + <NAME> + "=\"=?<CHARSET>?b?<10 chars>?=\""
+			if (lineLength + Name.Length + charset.Length + 10 + Math.Min (Value.Length, 10) >= options.MaxLineLength) {
+				builder.Append (options.NewLine);
+				builder.Append ('\t');
+				lineLength = 1;
+			} else {
+				builder.Append (' ');
+				lineLength++;
+			}
+
+			builder.AppendFormat ("{0}=\"", Name);
+			lineLength += Name.Length + 2;
+
+			do {
+				length = Rfc2047EncodeNextChunk (builder, Value, ref index, bestEncoding, charset, encoder, (options.MaxLineLength - lineLength) - 1);
+				lineLength += length;
+
+				if (index >= Value.Length)
+					break;
+
+				builder.Append (options.NewLine);
+				builder.Append ('\t');
+				lineLength = 1;
+			} while (true);
+
+			builder.Append ('\"');
+			lineLength++;
+		}
+
+		internal void Encode (FormatOptions options, StringBuilder builder, ref int lineLength, Encoding headerEncoding)
+		{
+			string quoted;
+
+			switch (GetEncodeMethod (options, Name, Value, out quoted)) {
+			case EncodeMethod.Rfc2231:
+				EncodeRfc2231 (options, builder, ref lineLength, headerEncoding);
+				break;
+			case EncodeMethod.Rfc2047:
+				EncodeRfc2047 (options, builder, ref lineLength, headerEncoding);
+				break;
+			case EncodeMethod.None:
+				quoted = Value;
+				goto default;
+			default:
+				builder.Append (';');
+				lineLength++;
+
+				if (lineLength + 1 + Name.Length + 1 + quoted.Length >= options.MaxLineLength) {
+					builder.Append (options.NewLine);
+					builder.Append ('\t');
+					lineLength = 1;
+				} else {
+					builder.Append (' ');
+					lineLength++;
+				}
+
+				lineLength += Name.Length + 1 + quoted.Length;
+				builder.Append (Name);
+				builder.Append ('=');
+				builder.Append (quoted);
+				break;
+			}
 		}
 
 		/// <summary>

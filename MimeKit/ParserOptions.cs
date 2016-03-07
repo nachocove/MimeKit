@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -69,9 +69,9 @@ namespace MimeKit {
 		/// <para>In general, you'll probably want this value to be <see cref="RfcComplianceMode.Loose"/>
 		/// (the default) as it allows maximum interoperability with existing (broken) mail clients
 		/// and other mail software such as sloppily written perl scripts (aka spambots).</para>
-		/// <para>It should be noted that even in <see cref="RfcComplianceMode.Strict"/> mode, the address
+		/// <para><alert class="tip">Even in <see cref="RfcComplianceMode.Strict"/> mode, the address
 		/// parser is fairly liberal in what it accepts. Setting it to <see cref="RfcComplianceMode.Loose"/>
-		/// just makes it try harder to deal with garbage input.</para>
+		/// just makes it try harder to deal with garbage input.</alert></para>
 		/// </remarks>
 		/// <value>The RFC compliance mode.</value>
 		public RfcComplianceMode AddressParserComplianceMode { get; set; }
@@ -83,9 +83,9 @@ namespace MimeKit {
 		/// <para>In general, you'll probably want this value to be <see cref="RfcComplianceMode.Loose"/>
 		/// (the default) as it allows maximum interoperability with existing (broken) mail clients
 		/// and other mail software such as sloppily written perl scripts (aka spambots).</para>
-		/// <para>It should be noted that even in <see cref="RfcComplianceMode.Strict"/> mode, the parameter
+		/// <para><alert class="tip">Even in <see cref="RfcComplianceMode.Strict"/> mode, the parameter
 		/// parser is fairly liberal in what it accepts. Setting it to <see cref="RfcComplianceMode.Loose"/>
-		/// just makes it try harder to deal with garbage input.</para>
+		/// just makes it try harder to deal with garbage input.</alert></para>
 		/// </remarks>
 		/// <value>The RFC compliance mode.</value>
 		public RfcComplianceMode ParameterComplianceMode { get; set; }
@@ -107,7 +107,8 @@ namespace MimeKit {
 		/// </summary>
 		/// <remarks>
 		/// For more details about why this may be useful, you can find more information
-		/// at http://www.jwz.org/doc/content-length.html
+		/// at <a href="http://www.jwz.org/doc/content-length.html">
+		/// http://www.jwz.org/doc/content-length.html</a>.
 		/// </remarks>
 		/// <value><c>true</c> if the Content-Length value should be respected;
 		/// otherwise, <c>false</c>.</value>
@@ -315,6 +316,8 @@ namespace MimeKit {
 					return new MultipartAlternative (args);
 				case "related":
 					return new MultipartRelated (args);
+				case "report":
+					return new MultipartReport (args);
 #if ENABLE_CRYPTO
 				case "encrypted":
 					return new MultipartEncrypted (args);

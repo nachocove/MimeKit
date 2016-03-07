@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -27,6 +27,8 @@
 using System;
 using System.IO;
 using System.Threading;
+
+using MimeKit.IO;
 
 namespace MimeKit {
 	/// <summary>
@@ -135,12 +137,12 @@ namespace MimeKit {
 		/// Dispatches to the specific visit method for this MIME entity.
 		/// </summary>
 		/// <remarks>
-		/// This default implementation for <see cref="MimeKit.MimeEntity"/> nodes
-		/// calls <see cref="MimeKit.MimeVisitor.VisitMimeEntity"/>. Override this
+		/// This default implementation for <see cref="MimeKit.MessagePart"/> nodes
+		/// calls <see cref="MimeKit.MimeVisitor.VisitMessagePart"/>. Override this
 		/// method to call into a more specific method on a derived visitor class
 		/// of the <see cref="MimeKit.MimeVisitor"/> class. However, it should still
 		/// support unknown visitors by calling
-		/// <see cref="MimeKit.MimeVisitor.VisitMimeEntity"/>.
+		/// <see cref="MimeKit.MimeVisitor.VisitMessagePart"/>.
 		/// </remarks>
 		/// <param name="visitor">The visitor.</param>
 		/// <exception cref="System.ArgumentNullException">
@@ -161,15 +163,15 @@ namespace MimeKit {
 		/// Prepares the MIME entity for transport using the specified encoding constraints.
 		/// </remarks>
 		/// <param name="constraint">The encoding constraint.</param>
-		/// <param name="maxLineLength">The maximum allowable length for a line (not counting the CRLF). Must be between <c>72</c> and <c>998</c> (inclusive).</param>
+		/// <param name="maxLineLength">The maximum number of octets allowed per line (not counting the CRLF). Must be between <c>60</c> and <c>998</c> (inclusive).</param>
 		/// <exception cref="System.ArgumentOutOfRangeException">
-		/// <para><paramref name="maxLineLength"/> is not between <c>72</c> and <c>998</c> (inclusive).</para>
+		/// <para><paramref name="maxLineLength"/> is not between <c>60</c> and <c>998</c> (inclusive).</para>
 		/// <para>-or-</para>
 		/// <para><paramref name="constraint"/> is not a valid value.</para>
 		/// </exception>
 		public override void Prepare (EncodingConstraint constraint, int maxLineLength = 78)
 		{
-			if (maxLineLength < 72 || maxLineLength > 998)
+			if (maxLineLength < FormatOptions.MinimumLineLength || maxLineLength > FormatOptions.MaximumLineLength)
 				throw new ArgumentOutOfRangeException ("maxLineLength");
 
 			if (Message != null)
@@ -184,6 +186,7 @@ namespace MimeKit {
 		/// </remarks>
 		/// <param name="options">The formatting options.</param>
 		/// <param name="stream">The output stream.</param>
+		/// <param name="contentOnly"><c>true</c> if only the content should be written; otherwise, <c>false</c>.</param>
 		/// <param name="cancellationToken">A cancellation token.</param>
 		/// <exception cref="System.ArgumentNullException">
 		/// <para><paramref name="options"/> is <c>null</c>.</para>
@@ -196,12 +199,26 @@ namespace MimeKit {
 		/// <exception cref="System.IO.IOException">
 		/// An I/O error occurred.
 		/// </exception>
-		public override void WriteTo (FormatOptions options, Stream stream, CancellationToken cancellationToken = default (CancellationToken))
+		public override void WriteTo (FormatOptions options, Stream stream, bool contentOnly, CancellationToken cancellationToken = default (CancellationToken))
 		{
-			base.WriteTo (options, stream, cancellationToken);
+			base.WriteTo (options, stream, contentOnly, cancellationToken);
 
-			if (Message != null)
-				Message.WriteTo (options, stream, cancellationToken);
+			if (Message == null)
+				return;
+
+			if (Message.MboxMarker != null && Message.MboxMarker.Length != 0) {
+				var cancellable = stream as ICancellableStream;
+
+				if (cancellable != null) {
+					cancellable.Write (Message.MboxMarker, 0, Message.MboxMarker.Length, cancellationToken);
+					cancellable.Write (options.NewLineBytes, 0, options.NewLineBytes.Length, cancellationToken);
+				} else {
+					stream.Write (Message.MboxMarker, 0, Message.MboxMarker.Length);
+					stream.Write (options.NewLineBytes, 0, options.NewLineBytes.Length);
+				}
+			}
+
+			Message.WriteTo (options, stream, cancellationToken);
 		}
 	}
 }

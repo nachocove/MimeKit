@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -71,6 +71,7 @@ namespace MimeKit.Cryptography {
 		{
 			string path;
 
+#if !COREFX
 			if (Path.DirectorySeparatorChar == '\\') {
 				var appData = Environment.GetFolderPath (Environment.SpecialFolder.ApplicationData);
 				path = Path.Combine (appData, "Roaming\\mimekit");
@@ -78,6 +79,9 @@ namespace MimeKit.Cryptography {
 				var home = Environment.GetFolderPath (Environment.SpecialFolder.Personal);
 				path = Path.Combine (home, ".mimekit");
 			}
+#else
+			path = ".mimekit";
+#endif
 
 			if (!Directory.Exists (path))
 				Directory.CreateDirectory (path);
@@ -195,7 +199,7 @@ namespace MimeKit.Cryptography {
 			dbase = database;
 		}
 
-		#region implemented abstract members of SecureMimeContext
+#region implemented abstract members of SecureMimeContext
 
 		/// <summary>
 		/// Gets the X.509 certificate matching the specified selector.
@@ -315,7 +319,7 @@ namespace MimeKit.Cryptography {
 		/// </exception>
 		protected override CmsRecipient GetCmsRecipient (MailboxAddress mailbox)
 		{
-			foreach (var record in dbase.Find (mailbox, DateTime.Now, false, CmsRecipientFields)) {
+			foreach (var record in dbase.Find (mailbox, DateTime.UtcNow, false, CmsRecipientFields)) {
 				if (record.KeyUsage != 0 && (record.KeyUsage & X509KeyUsageFlags.KeyEncipherment) == 0)
 					continue;
 
@@ -356,7 +360,7 @@ namespace MimeKit.Cryptography {
 		/// </exception>
 		protected override CmsSigner GetCmsSigner (MailboxAddress mailbox, DigestAlgorithm digestAlgo)
 		{
-			foreach (var record in dbase.Find (mailbox, DateTime.Now, true, CmsSignerFields)) {
+			foreach (var record in dbase.Find (mailbox, DateTime.UtcNow, true, CmsSignerFields)) {
 				if (record.KeyUsage != X509KeyUsageFlags.None && (record.KeyUsage & SecureMimeContext.DigitalSignatureKeyUsageFlags) == 0)
 					continue;
 
@@ -377,7 +381,7 @@ namespace MimeKit.Cryptography {
 		/// </remarks>
 		/// <param name="certificate">The certificate.</param>
 		/// <param name="algorithms">The encryption algorithm capabilities of the client (in preferred order).</param>
-		/// <param name="timestamp">The timestamp.</param>
+		/// <param name="timestamp">The timestamp in coordinated universal time (UTC).</param>
 		protected override void UpdateSecureMimeCapabilities (X509Certificate certificate, EncryptionAlgorithm[] algorithms, DateTime timestamp)
 		{
 			X509CertificateRecord record;
@@ -494,12 +498,12 @@ namespace MimeKit.Cryptography {
 					if (entry.Key.IsPrivate) {
 						if ((record = dbase.Find (chain[0].Certificate, ImportPkcs12Fields)) == null) {
 							record = new X509CertificateRecord (chain[0].Certificate, entry.Key);
-							record.AlgorithmsUpdated = DateTime.Now;
+							record.AlgorithmsUpdated = DateTime.UtcNow;
 							record.Algorithms = enabledAlgorithms;
 							record.IsTrusted = true;
 							dbase.Add (record);
 						} else {
-							record.AlgorithmsUpdated = DateTime.Now;
+							record.AlgorithmsUpdated = DateTime.UtcNow;
 							record.Algorithms = enabledAlgorithms;
 							if (record.PrivateKey == null)
 								record.PrivateKey = entry.Key;
@@ -523,7 +527,7 @@ namespace MimeKit.Cryptography {
 			}
 		}
 
-		#endregion
+#endregion
 
 		/// <summary>
 		/// Imports a DER-encoded certificate stream.

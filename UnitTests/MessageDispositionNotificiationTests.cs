@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -41,11 +41,12 @@ namespace UnitTests {
 		{
 			var message = MimeMessage.Load (Path.Combine ("..", "..", "TestData", "messages", "disposition-notification.txt"));
 
-			Assert.IsInstanceOf<Multipart> (message.Body, "Expected top-level body part to be a multipart/report.");
+			Assert.IsInstanceOf<MultipartReport> (message.Body, "Expected top-level body part to be a multipart/report.");
 
-			var multipart = (Multipart) message.Body;
+			var multipart = (MultipartReport) message.Body;
 
 			Assert.IsInstanceOf<MessageDispositionNotification> (multipart[1], "Expected second part to be a message/disposition-notification.");
+			Assert.AreEqual ("disposition-notification", multipart.ReportType);
 
 			var mdn = (MessageDispositionNotification) multipart[1];
 			var fields = mdn.Fields;

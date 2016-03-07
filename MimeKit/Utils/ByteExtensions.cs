@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc.
+// Copyright (c) 2013-2016 Xamarin Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -51,7 +51,7 @@ namespace MimeKit.Utils {
 	static class ByteExtensions
 	{
 		const string AtomSafeCharacters = "!#$%&'*+-/=?^_`{|}~";
-		const string AttributeSpecials = "*'%";    // attribute specials from rfc2184
+		const string AttributeSpecials = "*'%";    // attribute specials from rfc2184/rfc2231
 		const string CommentSpecials = "()\\\r";   // not allowed in comments
 		const string DomainSpecials = "[]\\\r \t"; // not allowed in domains
 		const string EncodedWordSpecials = "()<>@,;:\"/[]?.=_";  // rfc2047 5.1
@@ -79,12 +79,13 @@ namespace MimeKit.Utils {
 				for (i = 0; i < values.Length; i++)
 					table[values[i]] &= ~bit;
 
-				if (bitcopy != CharType.None) {
-					for (i = 0; i < 256; i++) {
-						if ((table[i] & bitcopy) != 0)
-							table[i] &= ~bit;
-					}
-				}
+				// Note: not actually used...
+				//if (bitcopy != CharType.None) {
+				//	for (i = 0; i < 256; i++) {
+				//		if ((table[i] & bitcopy) != 0)
+				//			table[i] &= ~bit;
+				//	}
+				//}
 			} else {
 				for (i = 0; i < values.Length; i++)
 					table[values[i]] |= bit;
@@ -138,10 +139,10 @@ namespace MimeKit.Utils {
 			SetFlags (EncodedPhraseSpecials, CharType.IsEncodedPhraseSafe, CharType.None, false);
 		}
 
-		public static bool IsAscii (this byte c)
-		{
-			return (table[c] & CharType.IsAscii) != 0;
-		}
+		//public static bool IsAscii (this byte c)
+		//{
+		//	return (table[c] & CharType.IsAscii) != 0;
+		//}
 
 		public static bool IsAsciiAtom (this byte c)
 		{
@@ -183,10 +184,10 @@ namespace MimeKit.Utils {
 			return (table[c] & (CharType.IsTokenSpecial | CharType.IsWhitespace | CharType.IsControl)) == 0;
 		}
 
-		public static bool IsTokenSpecial (this byte c)
-		{
-			return (table[c] & CharType.IsTokenSpecial) != 0;
-		}
+		//public static bool IsTokenSpecial (this byte c)
+		//{
+		//	return (table[c] & CharType.IsTokenSpecial) != 0;
+		//}
 
 		public static bool IsType (this byte c, CharType type)
 		{
@@ -203,21 +204,21 @@ namespace MimeKit.Utils {
 			return (table[c] & CharType.IsXDigit) != 0;
 		}
 
-		public static byte ToLower (this byte c)
-		{
-			if (c >= 0x41 && c <= 0x5A)
-				return (byte) (c + 0x20);
+		//public static byte ToLower (this byte c)
+		//{
+		//	if (c >= 0x41 && c <= 0x5A)
+		//		return (byte) (c + 0x20);
+		//
+		//	return c;
+		//}
 
-			return c;
-		}
-
-		public static byte ToUpper (this byte c)
-		{
-			if (c >= 0x61 && c <= 0x7A)
-				return (byte) (c - 0x20);
-
-			return c;
-		}
+		//public static byte ToUpper (this byte c)
+		//{
+		//	if (c >= 0x61 && c <= 0x7A)
+		//		return (byte) (c - 0x20);
+		//
+		//	return c;
+		//}
 
 		public static byte ToXDigit (this byte c)
 		{

@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc.
+// Copyright (c) 2013-2016 Xamarin Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -330,10 +330,12 @@ namespace MimeKit {
 
 		internal string Encode (FormatOptions options, Encoding charset)
 		{
-			int lineLength = "Content-Disposition: ".Length;
+			int lineLength = "Content-Disposition:".Length;
 			var value = new StringBuilder (" ");
 
 			value.Append (disposition);
+			lineLength += value.Length;
+
 			Parameters.Encode (options, value, ref lineLength, charset);
 			value.Append (options.NewLine);
 
@@ -349,10 +351,19 @@ namespace MimeKit {
 		/// optionally encoding the parameters as they would be encoded for trabsport.
 		/// </remarks>
 		/// <returns>The serialized string.</returns>
+		/// <param name="options">The formatting options.</param>
 		/// <param name="charset">The charset to be used when encoding the parameter values.</param>
 		/// <param name="encode">If set to <c>true</c>, the parameter values will be encoded.</param>
-		public string ToString (Encoding charset, bool encode)
+		/// <exception cref="System.ArgumentNullException">
+		/// <para><paramref name="options"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="charset"/> is <c>null</c>.</para>
+		/// </exception>
+		public string ToString (FormatOptions options, Encoding charset, bool encode)
 		{
+			if (options == null)
+				throw new ArgumentNullException ("options");
+
 			if (charset == null)
 				throw new ArgumentNullException ("charset");
 
@@ -362,12 +373,31 @@ namespace MimeKit {
 			if (encode) {
 				int lineLength = value.Length;
 
-				Parameters.Encode (FormatOptions.Default, value, ref lineLength, charset);
+				Parameters.Encode (options, value, ref lineLength, charset);
 			} else {
 				value.Append (Parameters.ToString ());
 			}
 
 			return value.ToString ();
+		}
+
+		/// <summary>
+		/// Serializes the <see cref="MimeKit.ContentDisposition"/> to a string,
+		/// optionally encoding the parameters.
+		/// </summary>
+		/// <remarks>
+		/// Creates a string-representation of the <see cref="ContentDisposition"/>,
+		/// optionally encoding the parameters as they would be encoded for trabsport.
+		/// </remarks>
+		/// <returns>The serialized string.</returns>
+		/// <param name="charset">The charset to be used when encoding the parameter values.</param>
+		/// <param name="encode">If set to <c>true</c>, the parameter values will be encoded.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="charset"/> is <c>null</c>.
+		/// </exception>
+		public string ToString (Encoding charset, bool encode)
+		{
+			return ToString (FormatOptions.Default, charset, encode);
 		}
 
 		/// <summary>
@@ -381,7 +411,7 @@ namespace MimeKit {
 		/// <see cref="MimeKit.ContentDisposition"/>.</returns>
 		public override string ToString ()
 		{
-			return ToString (Encoding.UTF8, false);
+			return ToString (FormatOptions.Default, Encoding.UTF8, false);
 		}
 
 		internal event EventHandler Changed;
@@ -474,17 +504,7 @@ namespace MimeKit {
 		/// </exception>
 		public static bool TryParse (ParserOptions options, byte[] buffer, int startIndex, int length, out ContentDisposition disposition)
 		{
-			if (options == null)
-				throw new ArgumentNullException ("options");
-
-			if (buffer == null)
-				throw new ArgumentNullException ("buffer");
-
-			if (startIndex < 0 || startIndex > buffer.Length)
-				throw new ArgumentOutOfRangeException ("startIndex");
-
-			if (length < 0 || length > (buffer.Length - startIndex))
-				throw new ArgumentOutOfRangeException ("length");
+			ParseUtils.ValidateArguments (options, buffer, startIndex, length);
 
 			int index = startIndex;
 
@@ -536,14 +556,7 @@ namespace MimeKit {
 		/// </exception>
 		public static bool TryParse (ParserOptions options, byte[] buffer, int startIndex, out ContentDisposition disposition)
 		{
-			if (options == null)
-				throw new ArgumentNullException ("options");
-
-			if (buffer == null)
-				throw new ArgumentNullException ("buffer");
-
-			if (startIndex < 0 || startIndex >= buffer.Length)
-				throw new ArgumentOutOfRangeException ("startIndex");
+			ParseUtils.ValidateArguments (options, buffer, startIndex);
 
 			int index = startIndex;
 
@@ -588,11 +601,7 @@ namespace MimeKit {
 		/// </exception>
 		public static bool TryParse (ParserOptions options, byte[] buffer, out ContentDisposition disposition)
 		{
-			if (options == null)
-				throw new ArgumentNullException ("options");
-
-			if (buffer == null)
-				throw new ArgumentNullException ("buffer");
+			ParseUtils.ValidateArguments (options, buffer);
 
 			int index = 0;
 
@@ -623,6 +632,31 @@ namespace MimeKit {
 		/// Parses a Content-Disposition value from the supplied text.
 		/// </remarks>
 		/// <returns><c>true</c>, if the disposition was successfully parsed, <c>false</c> otherwise.</returns>
+		/// <param name="options">The parser options.</param>
+		/// <param name="text">The text to parse.</param>
+		/// <param name="disposition">The parsed disposition.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <para><paramref name="options"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="text"/> is <c>null</c>.</para>
+		/// </exception>
+		public static bool TryParse (ParserOptions options, string text, out ContentDisposition disposition)
+		{
+			ParseUtils.ValidateArguments (options, text);
+
+			var buffer = Encoding.UTF8.GetBytes (text);
+			int index = 0;
+
+			return TryParse (ParserOptions.Default, buffer, ref index, buffer.Length, false, out disposition);
+		}
+
+		/// <summary>
+		/// Tries to parse the given text into a new <see cref="MimeKit.ContentDisposition"/> instance.
+		/// </summary>
+		/// <remarks>
+		/// Parses a Content-Disposition value from the supplied text.
+		/// </remarks>
+		/// <returns><c>true</c>, if the disposition was successfully parsed, <c>false</c> otherwise.</returns>
 		/// <param name="text">The text to parse.</param>
 		/// <param name="disposition">The parsed disposition.</param>
 		/// <exception cref="System.ArgumentNullException">
@@ -630,13 +664,7 @@ namespace MimeKit {
 		/// </exception>
 		public static bool TryParse (string text, out ContentDisposition disposition)
 		{
-			if (text == null)
-				throw new ArgumentNullException ("text");
-
-			var buffer = Encoding.UTF8.GetBytes (text);
-			int index = 0;
-
-			return TryParse (ParserOptions.Default, buffer, ref index, buffer.Length, false, out disposition);
+			return TryParse (ParserOptions.Default, text, out disposition);
 		}
 
 		/// <summary>
@@ -665,17 +693,7 @@ namespace MimeKit {
 		/// </exception>
 		public static ContentDisposition Parse (ParserOptions options, byte[] buffer, int startIndex, int length)
 		{
-			if (options == null)
-				throw new ArgumentNullException ("options");
-
-			if (buffer == null)
-				throw new ArgumentNullException ("buffer");
-
-			if (startIndex < 0 || startIndex > buffer.Length)
-				throw new ArgumentOutOfRangeException ("startIndex");
-
-			if (length < 0 || length > (buffer.Length - startIndex))
-				throw new ArgumentOutOfRangeException ("length");
+			ParseUtils.ValidateArguments (options, buffer, startIndex, length);
 
 			ContentDisposition disposition;
 			int index = startIndex;
@@ -734,14 +752,7 @@ namespace MimeKit {
 		/// </exception>
 		public static ContentDisposition Parse (ParserOptions options, byte[] buffer, int startIndex)
 		{
-			if (options == null)
-				throw new ArgumentNullException ("options");
-
-			if (buffer == null)
-				throw new ArgumentNullException ("buffer");
-
-			if (startIndex < 0 || startIndex > buffer.Length)
-				throw new ArgumentOutOfRangeException ("startIndex");
+			ParseUtils.ValidateArguments (options, buffer, startIndex);
 
 			ContentDisposition disposition;
 			int index = startIndex;
@@ -793,11 +804,7 @@ namespace MimeKit {
 		/// </exception>
 		public static ContentDisposition Parse (ParserOptions options, byte[] buffer)
 		{
-			if (options == null)
-				throw new ArgumentNullException ("options");
-
-			if (buffer == null)
-				throw new ArgumentNullException ("buffer");
+			ParseUtils.ValidateArguments (options, buffer);
 
 			ContentDisposition disposition;
 			int index = 0;
@@ -845,11 +852,7 @@ namespace MimeKit {
 		/// </exception>
 		public static ContentDisposition Parse (ParserOptions options, string text)
 		{
-			if (options == null)
-				throw new ArgumentNullException ("options");
-
-			if (text == null)
-				throw new ArgumentNullException ("text");
+			ParseUtils.ValidateArguments (options, text);
 
 			var buffer = Encoding.UTF8.GetBytes (text);
 			ContentDisposition disposition;

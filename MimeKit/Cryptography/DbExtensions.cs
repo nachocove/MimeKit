@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -24,7 +24,7 @@
 // THE SOFTWARE.
 //
 
-using System.Data;
+using System.Data.Common;
 
 namespace MimeKit.Cryptography {
 	/// <summary>
@@ -38,7 +38,7 @@ namespace MimeKit.Cryptography {
 		/// <param name="command">The database command.</param>
 		/// <param name="name">The parameter name.</param>
 		/// <param name="value">The parameter value.</param>
-		public static int AddParameterWithValue (this IDbCommand command, string name, object value)
+		public static int AddParameterWithValue (this DbCommand command, string name, object value)
 		{
 			var parameter = command.CreateParameter ();
 			parameter.ParameterName = name;

@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -53,7 +53,7 @@ namespace MimeKit {
 	/// <para>Unless overridden, all textual parts parsed by the <see cref="MimeParser"/>,
 	/// such as text/plain or text/html, will be represented by a <see cref="TextPart"/>.</para>
 	/// <para>For more information about text media types, see section 4.1 of
-	/// http://www.ietf.org/rfc/rfc2046.txt</para>
+	/// <a href="https://tools.ietf.org/html/rfc2046#section-4.1">rfc2046</a>.</para>
 	/// </remarks>
 	public class TextPart : MimePart
 	{
@@ -132,6 +132,10 @@ namespace MimeKit {
 			}
 		}
 
+		internal TextPart (ContentType contentType) : base (contentType)
+		{
+		}
+
 		/// <summary>
 		/// Initializes a new instance of the <see cref="MimeKit.TextPart"/>
 		/// class with the specified text subtype.
@@ -167,7 +171,7 @@ namespace MimeKit {
 		/// </remarks>
 		/// <value><c>true</c> if the text is enriched; otherwise, <c>false</c>.</value>
 		bool IsEnriched {
-			get { return ContentType.Matches ("text", "enriched") || ContentType.Matches ("text", "richtext"); }
+			get { return ContentType.IsMimeType ("text", "enriched") || ContentType.IsMimeType ("text", "richtext"); }
 		}
 
 		/// <summary>
@@ -197,7 +201,7 @@ namespace MimeKit {
 		/// </remarks>
 		/// <value><c>true</c> if the text is html; otherwise, <c>false</c>.</value>
 		public bool IsHtml {
-			get { return ContentType.Matches ("text", "html"); }
+			get { return ContentType.IsMimeType ("text", "html"); }
 		}
 
 		/// <summary>
@@ -208,7 +212,7 @@ namespace MimeKit {
 		/// </remarks>
 		/// <value><c>true</c> if the text is html; otherwise, <c>false</c>.</value>
 		public bool IsPlain {
-			get { return ContentType.Matches ("text", "plain"); }
+			get { return ContentType.IsMimeType ("text", "plain"); }
 		}
 
 		/// <summary>
@@ -219,7 +223,7 @@ namespace MimeKit {
 		/// </remarks>
 		/// <value><c>true</c> if the text is RTF; otherwise, <c>false</c>.</value>
 		public bool IsRichText {
-			get { return ContentType.Matches ("text", "rtf") || ContentType.Matches ("application", "rtf"); }
+			get { return ContentType.IsMimeType ("text", "rtf") || ContentType.IsMimeType ("application", "rtf"); }
 		}
 
 		/// <summary>
@@ -279,12 +283,12 @@ namespace MimeKit {
 		/// Dispatches to the specific visit method for this MIME entity.
 		/// </summary>
 		/// <remarks>
-		/// This default implementation for <see cref="MimeKit.MimeEntity"/> nodes
-		/// calls <see cref="MimeKit.MimeVisitor.VisitMimeEntity"/>. Override this
+		/// This default implementation for <see cref="MimeKit.TextPart"/> nodes
+		/// calls <see cref="MimeKit.MimeVisitor.VisitTextPart"/>. Override this
 		/// method to call into a more specific method on a derived visitor class
 		/// of the <see cref="MimeKit.MimeVisitor"/> class. However, it should still
 		/// support unknown visitors by calling
-		/// <see cref="MimeKit.MimeVisitor.VisitMimeEntity"/>.
+		/// <see cref="MimeKit.MimeVisitor.VisitTextPart"/>.
 		/// </remarks>
 		/// <param name="visitor">The visitor.</param>
 		/// <exception cref="System.ArgumentNullException">

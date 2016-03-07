@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc.
+// Copyright (c) 2013-2016 Xamarin Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -36,6 +36,7 @@ using Encoding = Portable.Text.Encoding;
 #endif
 
 using MimeKit.IO;
+using MimeKit.Utils;
 
 namespace MimeKit {
 	/// <summary>
@@ -56,7 +57,7 @@ namespace MimeKit {
 
 		internal HeaderList (ParserOptions options)
 		{
-			table = new Dictionary<string, Header> (StringComparer.OrdinalIgnoreCase);
+			table = new Dictionary<string, Header> (MimeUtils.OrdinalIgnoreCase);
 			headers = new List<Header> ();
 			Options = options;
 		}
@@ -87,7 +88,7 @@ namespace MimeKit {
 		/// </exception>
 		public void Add (HeaderId id, string value)
 		{
-			Add (new Header (id, value));
+			Add (id, Encoding.UTF8, value);
 		}
 
 		/// <summary>
@@ -108,7 +109,53 @@ namespace MimeKit {
 		/// </exception>
 		public void Add (string field, string value)
 		{
-			Add (new Header (field, value));
+			Add (field, Encoding.UTF8, value);
+		}
+
+		/// <summary>
+		/// Adds a header with the specified field and value.
+		/// </summary>
+		/// <remarks>
+		/// Adds a new header for the specified field and value pair.
+		/// </remarks>
+		/// <param name="id">The header identifier.</param>
+		/// <param name="encoding">The character encoding to use for the value.</param>
+		/// <param name="value">The header value.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <para><paramref name="encoding"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="value"/> is <c>null</c>.</para>
+		/// </exception>
+		/// <exception cref="System.ArgumentOutOfRangeException">
+		/// <paramref name="id"/> is not a valid <see cref="HeaderId"/>.
+		/// </exception>
+		public void Add (HeaderId id, Encoding encoding, string value)
+		{
+			Add (new Header (encoding, id, value));
+		}
+
+		/// <summary>
+		/// Adds a header with the specified field and value.
+		/// </summary>
+		/// <remarks>
+		/// Adds a new header for the specified field and value pair.
+		/// </remarks>
+		/// <param name="field">The name of the header field.</param>
+		/// <param name="encoding">The character encoding to use for the value.</param>
+		/// <param name="value">The header value.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <para><paramref name="field"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="encoding"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="value"/> is <c>null</c>.</para>
+		/// </exception>
+		/// <exception cref="System.ArgumentException">
+		/// The <paramref name="field"/> contains illegal characters.
+		/// </exception>
+		public void Add (string field, Encoding encoding, string value)
+		{
+			Add (new Header (encoding, field, value));
 		}
 
 		/// <summary>
@@ -218,10 +265,7 @@ namespace MimeKit {
 		/// </exception>
 		public void Insert (int index, HeaderId id, string value)
 		{
-			if (index < 0 || index > Count)
-				throw new ArgumentOutOfRangeException ("index");
-
-			Insert (index, new Header (id, value));
+			Insert (index, id, Encoding.UTF8, value);
 		}
 
 		/// <summary>
@@ -246,10 +290,60 @@ namespace MimeKit {
 		/// </exception>
 		public void Insert (int index, string field, string value)
 		{
-			if (index < 0 || index > Count)
-				throw new ArgumentOutOfRangeException ("index");
+			Insert (index, field, Encoding.UTF8, value);
+		}
 
-			Insert (index, new Header (field, value));
+		/// <summary>
+		/// Inserts a header with the specified field and value at the given index.
+		/// </summary>
+		/// <remarks>
+		/// Inserts the header at the specified index in the list.
+		/// </remarks>
+		/// <param name="index">The index to insert the header.</param>
+		/// <param name="id">The header identifier.</param>
+		/// <param name="encoding">The character encoding to use for the value.</param>
+		/// <param name="value">The header value.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <para><paramref name="encoding"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="value"/> is <c>null</c>.</para>
+		/// </exception>
+		/// <exception cref="System.ArgumentOutOfRangeException">
+		/// <para><paramref name="id"/> is not a valid <see cref="HeaderId"/>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="index"/> is out of range.</para>
+		/// </exception>
+		public void Insert (int index, HeaderId id, Encoding encoding, string value)
+		{
+			Insert (index, new Header (encoding, id, value));
+		}
+
+		/// <summary>
+		/// Inserts a header with the specified field and value at the given index.
+		/// </summary>
+		/// <remarks>
+		/// Inserts the header at the specified index in the list.
+		/// </remarks>
+		/// <param name="index">The index to insert the header.</param>
+		/// <param name="field">The name of the header field.</param>
+		/// <param name="encoding">The character encoding to use for the value.</param>
+		/// <param name="value">The header value.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <para><paramref name="field"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="encoding"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="value"/> is <c>null</c>.</para>
+		/// </exception>
+		/// <exception cref="System.ArgumentException">
+		/// The <paramref name="field"/> contains illegal characters.
+		/// </exception>
+		/// <exception cref="System.ArgumentOutOfRangeException">
+		/// <paramref name="index"/> is out of range.
+		/// </exception>
+		public void Insert (int index, string field, Encoding encoding, string value)
+		{
+			Insert (index, new Header (encoding, field, value));
 		}
 
 		/// <summary>
@@ -315,7 +409,7 @@ namespace MimeKit {
 		public bool Remove (HeaderId id)
 		{
 			if (id == HeaderId.Unknown)
-				throw new ArgumentNullException ("id");
+				throw new ArgumentOutOfRangeException ("id");
 
 			Header header;
 			if (!table.TryGetValue (id.ToHeaderName (), out header))
@@ -424,51 +518,7 @@ namespace MimeKit {
 		/// </exception>
 		public void Replace (HeaderId id, Encoding encoding, string value)
 		{
-			if (id == HeaderId.Unknown)
-				throw new ArgumentOutOfRangeException ("id");
-
-			if (encoding == null)
-				throw new ArgumentNullException ("encoding");
-
-			if (value == null)
-				throw new ArgumentNullException ("value");
-
 			Replace (new Header (encoding, id, value));
-		}
-
-		/// <summary>
-		/// Replaces all headers with identical field names with the single specified header.
-		/// </summary>
-		/// <remarks>
-		/// <para>Replaces all headers with identical field names with the single specified header.</para>
-		/// <para>If no headers with the specified field name exist, it is simply added.</para>
-		/// </remarks>
-		/// <param name="id">The header identifier.</param>
-		/// <param name="charset">The charset to use for the value.</param>
-		/// <param name="value">The header value.</param>
-		/// <exception cref="System.ArgumentNullException">
-		/// <para><paramref name="charset"/> is <c>null</c>.</para>
-		/// <para>-or-</para>
-		/// <para><paramref name="value"/> is <c>null</c>.</para>
-		/// </exception>
-		/// <exception cref="System.ArgumentOutOfRangeException">
-		/// <paramref name="id"/> is not a valid <see cref="HeaderId"/>.
-		/// </exception>
-		/// <exception cref="System.NotSupportedException">
-		/// <paramref name="charset"/> is not supported.
-		/// </exception>
-		public void Replace (HeaderId id, string charset, string value)
-		{
-			if (id == HeaderId.Unknown)
-				throw new ArgumentOutOfRangeException ("id");
-
-			if (charset == null)
-				throw new ArgumentNullException ("charset");
-
-			if (value == null)
-				throw new ArgumentNullException ("value");
-
-			Replace (new Header (charset, id, value));
 		}
 
 		/// <summary>
@@ -488,12 +538,6 @@ namespace MimeKit {
 		/// </exception>
 		public void Replace (HeaderId id, string value)
 		{
-			if (id == HeaderId.Unknown)
-				throw new ArgumentOutOfRangeException ("id");
-
-			if (value == null)
-				throw new ArgumentNullException ("value");
-
 			Replace (new Header (id, value));
 		}
 
@@ -516,53 +560,7 @@ namespace MimeKit {
 		/// </exception>
 		public void Replace (string field, Encoding encoding, string value)
 		{
-			if (field == null)
-				throw new ArgumentNullException ("field");
-
-			if (encoding == null)
-				throw new ArgumentNullException ("encoding");
-
-			if (value == null)
-				throw new ArgumentNullException ("value");
-
 			Replace (new Header (encoding, field, value));
-		}
-
-		/// <summary>
-		/// Replaces all headers with identical field names with the single specified header.
-		/// </summary>
-		/// <remarks>
-		/// <para>Replaces all headers with identical field names with the single specified header.</para>
-		/// <para>If no headers with the specified field name exist, it is simply added.</para>
-		/// </remarks>
-		/// <param name="field">The name of the header field.</param>
-		/// <param name="charset">The charset to use for the value.</param>
-		/// <param name="value">The header value.</param>
-		/// <exception cref="System.ArgumentNullException">
-		/// <para><paramref name="field"/> is <c>null</c>.</para>
-		/// <para>-or-</para>
-		/// <para><paramref name="charset"/> is <c>null</c>.</para>
-		/// <para>-or-</para>
-		/// <para><paramref name="value"/> is <c>null</c>.</para>
-		/// </exception>
-		/// <exception cref="System.ArgumentException">
-		/// The <paramref name="field"/> contains illegal characters.
-		/// </exception>
-		/// <exception cref="System.NotSupportedException">
-		/// <paramref name="charset"/> is not supported.
-		/// </exception>
-		public void Replace (string field, string charset, string value)
-		{
-			if (field == null)
-				throw new ArgumentNullException ("field");
-
-			if (charset == null)
-				throw new ArgumentNullException ("charset");
-
-			if (value == null)
-				throw new ArgumentNullException ("value");
-
-			Replace (new Header (charset, field, value));
 		}
 
 		/// <summary>
@@ -584,12 +582,6 @@ namespace MimeKit {
 		/// </exception>
 		public void Replace (string field, string value)
 		{
-			if (field == null)
-				throw new ArgumentNullException ("field");
-
-			if (value == null)
-				throw new ArgumentNullException ("value");
-
 			Replace (new Header (field, value));
 		}
 
@@ -1239,7 +1231,7 @@ namespace MimeKit {
 			return Load (ParserOptions.Default, stream, cancellationToken);
 		}
 
-#if !PORTABLE && !COREFX
+#if !PORTABLE
 		/// <summary>
 		/// Load a <see cref="HeaderList"/> from the specified file.
 		/// </summary>

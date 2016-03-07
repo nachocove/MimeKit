@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2014 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -42,7 +42,7 @@ namespace UnitTests {
 		[Test]
 		public void TestReserialization ()
 		{
-			const string rawMessageText = @"X-Andrew-Authenticated-As: 4099;greenbush.galaxy;Nathaniel Borenstein
+			string rawMessageText = @"X-Andrew-Authenticated-As: 4099;greenbush.galaxy;Nathaniel Borenstein
 Received: from Messages.8.5.N.CUILIB.3.45.SNAP.NOT.LINKED.greenbush.galaxy.sun4.41
           via MS.5.6.greenbush.galaxy.sun4_41;
           Fri, 12 Jun 1992 13:29:05 -0400 (EDT)
@@ -52,7 +52,7 @@ From: Nathaniel Borenstein <nsb>
 X-Andrew-Message-Size: 152+1
 MIME-Version: 1.0
 Content-Type: multipart/alternative; 
-	boundary=""Interpart.Boundary.IeCBvV20M2YtEoUA0A""
+	boundary=""Multipart.Alternative.IeCBvV20M2YtEoUA0A""
 To: Ned Freed <ned@innosoft.com>,
     ysato@etl.go.jp (Yutaka Sato =?ISO-2022-JP?B?GyRAOjRGI0stGyhK?= )
 Subject: MIME & int'l mail
@@ -60,7 +60,7 @@ Subject: MIME & int'l mail
 > THIS IS A MESSAGE IN 'MIME' FORMAT.  Your mail reader does not support MIME.
 > Please read the first section, which is plain text, and ignore the rest.
 
---Interpart.Boundary.IeCBvV20M2YtEoUA0A
+--Multipart.Alternative.IeCBvV20M2YtEoUA0A
 Content-type: text/plain; charset=US-ASCII
 
 In honor of the Communications Week error about MIME's ability to handle
@@ -70,11 +70,11 @@ international character sets. a screen dump:
 displayed.]
 Just for fun....  -- Nathaniel
 
---Interpart.Boundary.IeCBvV20M2YtEoUA0A
+--Multipart.Alternative.IeCBvV20M2YtEoUA0A
 Content-Type: multipart/mixed; 
-	boundary=""Alternative.Boundary.IeCBvV20M2Yt4oU=wd""
+	boundary=""Multipart.Mixed.IeCBvV20M2Yt4oU=wd""
 
---Alternative.Boundary.IeCBvV20M2Yt4oU=wd
+--Multipart.Mixed.IeCBvV20M2Yt4oU=wd
 Content-type: text/richtext; charset=US-ASCII
 Content-Transfer-Encoding: quoted-printable
 
@@ -82,9 +82,8 @@ In honor of the <italic>Communications Week</italic> error about MIME's abilit=
 y to handle international character sets. a screen dump:<nl>
 <nl>
 
---Alternative.Boundary.IeCBvV20M2Yt4oU=wd
+--Multipart.Mixed.IeCBvV20M2Yt4oU=wd
 Content-type: image/gif
-Content-Description: Some international characters
 Content-Transfer-Encoding: base64
 
 R0lGODdhEgLiAKEAAAAAAP///wAA////4CwAAAAAEgLiAAAC/oSPqcvtD6OctNqLs968
@@ -93,7 +92,20 @@ R+mUIAiVUTmCU0mVJmiVV5mCfaiVQtaUXVlKXwmWZiSWY3lDZWmWIISWaalUWcmW+bWW
 b9lAcSmXCUSXdWlKbomX7HWXe4llXOmXQAmYgTmUg0mYRmmYh5mUscGYjemYjwmZkSmZ
 k0mZlWmZl4mZqVEAADs=
 
---Alternative.Boundary.IeCBvV20M2Yt4oU=wd
+--Multipart.Mixed.IeCBvV20M2Yt4oU=wd
+Content-type: message/rfc822
+Content-Description: a message with an mbox marker
+
+From mbox@localhost
+Date: Fri, 22 Jan 2016 8:44:05 -0500 (EST)
+From: MimeKit Unit Tests <unit.tests@mimekit.org>
+To: MimeKit Unit Tests <unit.tests@mimekit.org>
+MIME-Version: 1.0
+Content-type: text/plain
+
+This is an attached message.
+
+--Multipart.Mixed.IeCBvV20M2Yt4oU=wd
 Content-type: text/richtext; charset=US-ASCII
 Content-Transfer-Encoding: quoted-printable
 
@@ -101,13 +113,155 @@ Content-Transfer-Encoding: quoted-printable
 <nl>
 Just for fun....  -- Nathaniel<nl>
 
---Alternative.Boundary.IeCBvV20M2Yt4oU=wd--
-
---Interpart.Boundary.IeCBvV20M2YtEoUA0A--
-";
+--Multipart.Alternative.IeCBvV20M2YtEoUA0A--
+".Replace ("\r\n", "\n");
 			string result;
 
-			using (var source = new MemoryStream (Encoding.UTF8.GetBytes (rawMessageText.Replace ("\r\n", "\n")))) {
+			using (var source = new MemoryStream (Encoding.UTF8.GetBytes (rawMessageText))) {
+				var parser = new MimeParser (source, MimeFormat.Default);
+				var message = parser.ParseMessage ();
+
+				using (var serialized = new MemoryStream ()) {
+					var options = FormatOptions.Default.Clone ();
+					options.NewLineFormat = NewLineFormat.Unix;
+
+					message.WriteTo (options, serialized);
+
+					result = Encoding.UTF8.GetString (serialized.ToArray ());
+				}
+			}
+
+			Assert.AreEqual (rawMessageText, result, "Reserialized message is not identical to the original.");
+		}
+
+		[Test]
+		public void TestReserializationEmptyParts ()
+		{
+			string rawMessageText = @"Date: Fri, 22 Jan 2016 8:44:05 -0500 (EST)
+From: MimeKit Unit Tests <unit.tests@mimekit.org>
+To: MimeKit Unit Tests <unit.tests@mimekit.org>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; 
+	boundary=""Interpart.Boundary.IeCBvV20M2YtEoUA0A""
+Subject: Reserialization test of empty mime parts
+
+THIS IS A MESSAGE IN 'MIME' FORMAT.  Your mail reader does not support MIME.
+Please read the first section, which is plain text, and ignore the rest.
+
+--Interpart.Boundary.IeCBvV20M2YtEoUA0A
+Content-type: text/plain; charset=US-ASCII
+
+This is the body.
+
+--Interpart.Boundary.IeCBvV20M2YtEoUA0A
+Content-type: text/plain; charset=US-ASCII; name=empty.txt
+Content-Description: this part contains no content
+
+--Interpart.Boundary.IeCBvV20M2YtEoUA0A
+Content-type: text/plain; charset=US-ASCII; name=blank-line.txt
+Content-Description: this part contains a single blank line
+
+
+--Interpart.Boundary.IeCBvV20M2YtEoUA0A--
+".Replace ("\r\n", "\n");
+			string result;
+
+			using (var source = new MemoryStream (Encoding.UTF8.GetBytes (rawMessageText))) {
+				var parser = new MimeParser (source, MimeFormat.Default);
+				var message = parser.ParseMessage ();
+
+				using (var serialized = new MemoryStream ()) {
+					var options = FormatOptions.Default.Clone ();
+					options.NewLineFormat = NewLineFormat.Unix;
+
+					message.WriteTo (options, serialized);
+
+					result = Encoding.UTF8.GetString (serialized.ToArray ());
+				}
+			}
+
+			Assert.AreEqual (rawMessageText, result, "Reserialized message is not identical to the original.");
+		}
+
+		[Test]
+		public void TestReserializationMessageParts ()
+		{
+			string rawMessageText = @"Path: flop.mcom.com!news.Stanford.EDU!agate!tcsi.tcs.com!uunet!vixen.cso.uiuc.edu!gateway
+From: Internet-Drafts@CNRI.Reston.VA.US
+Subject: I-D ACTION:draft-smith-ipatm-bcast-00.txt
+Date: 25 Apr 95 15:09:13 GMT
+Organization: University of Illinois at Urbana
+Lines: 96
+Approved: Usenet@ux1.cso.uiuc.edu
+Message-ID: <9504251109.aa04587@IETF.CNRI.Reston.VA.US>
+Reply-To: Internet-Drafts@CNRI.Reston.VA.US
+NNTP-Posting-Host: ux1.cso.uiuc.edu
+Mime-Version: 1.0
+Content-Type: Multipart/Mixed; Boundary=""NextPart""
+Originator: daemon@ux1.cso.uiuc.edu
+
+--NextPart
+
+here are a couple of external bodies:
+
+--NextPart
+Content-Type: Multipart/MIXED; Boundary=""OtherAccess""
+
+--OtherAccess
+Content-Type:  Message/External-body;
+        access-type=""mail-server"";
+        server=""mailserv@ds.internic.net""
+
+Content-Type: text/plain
+Content-ID: <19950424144009.I-D@CNRI.Reston.VA.US>
+
+ENCODING mime
+FILE /internet-drafts/draft-smith-ipatm-bcast-00.txt
+
+--OtherAccess
+Content-Type:   Message/External-body;
+        name=""draft-smith-ipatm-bcast-00.txt"";
+        site=""ds.internic.net"";
+        access-type=""anon-ftp"";
+        directory=""internet-drafts""
+
+Content-Type: text/plain
+Content-ID: <19950424144009.I-D@CNRI.Reston.VA.US>
+
+--OtherAccess
+Content-Type: message/external-body;
+        access-type=""URL"";
+        url=""http://home.netscape.com/
+		people/
+		jwz/
+		index.html""
+
+Content-Type: TEXT/HTML
+Content-ID: <spankulate@hubba.hubba.hubba>
+
+--OtherAccess
+Content-Type: message/external-body;
+        access-type=""local-file"";
+        name=""/some/directory/loser.gif""
+
+Content-Type: image/gif
+Content-ID: <spankulate3@hubba.hubba.hubba>
+
+--OtherAccess
+Content-Type: message/external-body;
+        access-type=""afs"";
+        name=""/afs/directory/loser.gif""
+
+Content-Type: image/gif
+Content-ID: <spankulate4@hubba.hubba.hubba>
+
+--OtherAccess--
+
+--NextPart--
+".Replace ("\r\n", "\n");
+			string result;
+
+			using (var source = new MemoryStream (Encoding.UTF8.GetBytes (rawMessageText))) {
 				var parser = new MimeParser (source, MimeFormat.Default);
 				var message = parser.ParseMessage ();
 
@@ -128,6 +282,14 @@ Just for fun....  -- Nathaniel<nl>
 		public void TestMailMessageToMimeMessage ()
 		{
 			var mail = new MailMessage ();
+			mail.Sender = new MailAddress ("sender@sender.com", "The Real Sender");
+			mail.From = new MailAddress ("from@from.com", "From Whence it Came");
+			mail.ReplyToList.Add (new MailAddress ("reply-to@reply-to.com"));
+			mail.To.Add (new MailAddress ("to@to.com", "The Primary Recipient"));
+			mail.CC.Add (new MailAddress ("cc@cc.com", "The Carbon-Copied Recipient"));
+			mail.Bcc.Add (new MailAddress ("bcc@bcc.com", "The Blind Carbon-Copied Recipient"));
+			mail.Subject = "This is the message subject";
+			mail.Priority = MailPriority.High;
 			mail.Body = null;
 
 			var text = new MemoryStream (Encoding.ASCII.GetBytes ("This is plain text."), false);
@@ -138,8 +300,22 @@ Just for fun....  -- Nathaniel<nl>
 
 			var message = (MimeMessage) mail;
 
-			Assert.IsTrue (message.Body is Multipart, "THe top-level MIME part should be a multipart.");
-			Assert.IsTrue (message.Body.ContentType.Matches ("multipart", "alternative"), "The top-level MIME part should be multipart/alternative.");
+			Assert.AreEqual (mail.Sender.DisplayName, message.Sender.Name, "The sender names do not match.");
+			Assert.AreEqual (mail.Sender.Address, message.Sender.Address, "The sender addresses do not match.");
+			Assert.AreEqual (mail.From.DisplayName, message.From[0].Name, "The from names do not match.");
+			Assert.AreEqual (mail.From.Address, ((MailboxAddress) message.From[0]).Address, "The from addresses do not match.");
+			Assert.AreEqual (mail.ReplyToList[0].DisplayName, message.ReplyTo[0].Name, "The reply-to names do not match.");
+			Assert.AreEqual (mail.ReplyToList[0].Address, ((MailboxAddress) message.ReplyTo[0]).Address, "The reply-to addresses do not match.");
+			Assert.AreEqual (mail.To[0].DisplayName, message.To[0].Name, "The to names do not match.");
+			Assert.AreEqual (mail.To[0].Address, ((MailboxAddress) message.To[0]).Address, "The to addresses do not match.");
+			Assert.AreEqual (mail.CC[0].DisplayName, message.Cc[0].Name, "The cc names do not match.");
+			Assert.AreEqual (mail.CC[0].Address, ((MailboxAddress) message.Cc[0]).Address, "The cc addresses do not match.");
+			Assert.AreEqual (mail.Bcc[0].DisplayName, message.Bcc[0].Name, "The bcc names do not match.");
+			Assert.AreEqual (mail.Bcc[0].Address, ((MailboxAddress) message.Bcc[0]).Address, "The bcc addresses do not match.");
+			Assert.AreEqual (mail.Subject, message.Subject, "The message subjects do not match.");
+			Assert.AreEqual (MessagePriority.Urgent, message.Priority, "The message priority does not match.");
+			Assert.IsTrue (message.Body is Multipart, "The top-level MIME part should be a multipart.");
+			Assert.IsTrue (message.Body.ContentType.IsMimeType ("multipart", "alternative"), "The top-level MIME part should be multipart/alternative.");
 
 			var multipart = (Multipart) message.Body;
 
@@ -394,28 +570,186 @@ Just for fun....  -- Nathaniel<nl>
 		}
 
 		[Test]
-		public void TestHtmlAndTextBodies ()
+		public void TestImportanceChanged ()
 		{
 			var message = new MimeMessage ();
-			var builder = new BodyBuilder ();
 
-			builder.HtmlBody = "<html>This is an <b>html</b> body.</html>";
-			builder.TextBody = "This is the text body.";
+			message.Headers.Add (HeaderId.Importance, "high");
+			Assert.AreEqual (MessageImportance.High, message.Importance);
 
-			builder.LinkedResources.Add ("empty.gif", new byte[0]);
-			builder.LinkedResources.Add ("empty.jpg", new byte[0]);
-			builder.Attachments.Add ("document.xls", new byte[0]);
+			message.Headers.Remove (HeaderId.Importance);
+			Assert.AreEqual (MessageImportance.Normal, message.Importance);
 
-			foreach (var resource in builder.LinkedResources)
-				resource.ContentId = MimeUtils.GenerateMessageId ();
+			message.Headers.Add (HeaderId.Importance, "low");
+			Assert.AreEqual (MessageImportance.Low, message.Importance);
 
-			message.From.Add (new MailboxAddress ("Example Name", "name@example.com"));
-			message.To.Add (new MailboxAddress ("Destination", "dest@example.com"));
-			message.Subject = "This is the subject";
-			message.Body = builder.ToMessageBody ();
+			message.Headers.Remove (HeaderId.Importance);
+			Assert.AreEqual (MessageImportance.Normal, message.Importance);
 
-			Assert.AreEqual (builder.HtmlBody, message.HtmlBody, "The HTML bodies do not match.");
-			Assert.AreEqual (builder.TextBody, message.TextBody, "The text bodies do not match.");
+			message.Headers.Add (HeaderId.Importance, "normal");
+			Assert.AreEqual (MessageImportance.Normal, message.Importance);
+
+			message.Headers.Remove (HeaderId.Importance);
+			Assert.AreEqual (MessageImportance.Normal, message.Importance);
+
+			message.Headers.Add (HeaderId.Importance, "invalid-value");
+			Assert.AreEqual (MessageImportance.Normal, message.Importance);
+		}
+
+		[Test]
+		public void TestPriorityChanged ()
+		{
+			var message = new MimeMessage ();
+
+			message.Headers.Add (HeaderId.Priority, "urgent");
+			Assert.AreEqual (MessagePriority.Urgent, message.Priority);
+
+			message.Headers.Remove (HeaderId.Priority);
+			Assert.AreEqual (MessagePriority.Normal, message.Priority);
+
+			message.Headers.Add (HeaderId.Priority, "non-urgent");
+			Assert.AreEqual (MessagePriority.NonUrgent, message.Priority);
+
+			message.Headers.Remove (HeaderId.Priority);
+			Assert.AreEqual (MessagePriority.Normal, message.Priority);
+
+			message.Headers.Add (HeaderId.Priority, "normal");
+			Assert.AreEqual (MessagePriority.Normal, message.Priority);
+
+			message.Headers.Remove (HeaderId.Priority);
+			Assert.AreEqual (MessagePriority.Normal, message.Priority);
+
+			message.Headers.Add (HeaderId.Priority, "invalid-value");
+			Assert.AreEqual (MessagePriority.Normal, message.Priority);
+		}
+
+		[Test]
+		public void TestReferencesChanged ()
+		{
+			var message = new MimeMessage ();
+			Header references;
+
+			message.Headers.Add (HeaderId.References, "<id1@localhost> <id2@localhost>");
+			Assert.AreEqual (2, message.References.Count, "The number of references does not match.");
+			Assert.AreEqual ("id1@localhost", message.References[0], "The first references does not match.");
+			Assert.AreEqual ("id2@localhost", message.References[1], "The second references does not match.");
+
+			message.References.Add ("id3@localhost");
+
+			Assert.IsTrue (message.Headers.TryGetHeader ("References", out references), "Failed to get References header.");
+			Assert.AreEqual ("<id1@localhost> <id2@localhost> <id3@localhost>", references.Value, "The modified Reference header does not match.");
+
+			message.References.Clear ();
+
+			Assert.IsFalse (message.Headers.TryGetHeader ("References", out references), "References header should have been removed.");
+		}
+
+		[Test]
+		public void TestClearHeaders ()
+		{
+			var message = new MimeMessage ();
+
+			message.Subject = "Clear the headers!";
+
+			message.Sender = new MailboxAddress ("Sender", "sender@sender.com");
+			message.ReplyTo.Add (new MailboxAddress ("Reply-To", "reply-to@reply-to.com"));
+			message.From.Add (new MailboxAddress ("From", "from@from.com"));
+			message.To.Add (new MailboxAddress ("To", "to@to.com"));
+			message.Cc.Add (new MailboxAddress ("Cc", "cc@cc.com"));
+			message.Bcc.Add (new MailboxAddress ("Bcc", "bcc@bcc.com"));
+			message.MessageId = MimeUtils.GenerateMessageId ();
+			message.Date = DateTimeOffset.Now;
+
+			message.ResentSender = new MailboxAddress ("Sender", "sender@sender.com");
+			message.ResentReplyTo.Add (new MailboxAddress ("Reply-To", "reply-to@reply-to.com"));
+			message.ResentFrom.Add (new MailboxAddress ("From", "from@from.com"));
+			message.ResentTo.Add (new MailboxAddress ("To", "to@to.com"));
+			message.ResentCc.Add (new MailboxAddress ("Cc", "cc@cc.com"));
+			message.ResentBcc.Add (new MailboxAddress ("Bcc", "bcc@bcc.com"));
+			message.ResentMessageId = MimeUtils.GenerateMessageId ();
+			message.ResentDate = DateTimeOffset.Now;
+
+			message.Importance = MessageImportance.High;
+			message.Priority = MessagePriority.Urgent;
+
+			message.References.Add ("<id1@localhost>");
+			message.InReplyTo = "<id1@localhost>";
+
+			message.MimeVersion = new Version (1, 0);
+
+			message.Headers.Clear ();
+
+			Assert.IsNull (message.Subject, "Subject has not been cleared.");
+
+			Assert.IsNull (message.Sender, "Sender has not been cleared.");
+			Assert.AreEqual (0, message.ReplyTo.Count, "Reply-To has not been cleared.");
+			Assert.AreEqual (0, message.From.Count, "From has not been cleared.");
+			Assert.AreEqual (0, message.To.Count, "To has not been cleared.");
+			Assert.AreEqual (0, message.Cc.Count, "Cc has not been cleared.");
+			Assert.AreEqual (0, message.Bcc.Count, "Bcc has not been cleared.");
+			Assert.IsNull (message.MessageId, "Message-Id has not been cleared.");
+			Assert.AreEqual (DateTimeOffset.MinValue, message.Date, "Date has not been cleared.");
+
+			Assert.IsNull (message.ResentSender, "Resent-Sender has not been cleared.");
+			Assert.AreEqual (0, message.ResentReplyTo.Count, "Resent-Reply-To has not been cleared.");
+			Assert.AreEqual (0, message.ResentFrom.Count, "Resent-From has not been cleared.");
+			Assert.AreEqual (0, message.ResentTo.Count, "Resent-To has not been cleared.");
+			Assert.AreEqual (0, message.ResentCc.Count, "Resent-Cc has not been cleared.");
+			Assert.AreEqual (0, message.ResentBcc.Count, "Resent-Bcc has not been cleared.");
+			Assert.IsNull (message.ResentMessageId, "Resent-Message-Id has not been cleared.");
+			Assert.AreEqual (DateTimeOffset.MinValue, message.ResentDate, "Resent-Date has not been cleared.");
+
+			Assert.AreEqual (MessageImportance.Normal, message.Importance, "Importance has not been cleared.");
+			Assert.AreEqual (MessagePriority.Normal, message.Priority, "Priority has not been cleared.");
+
+			Assert.AreEqual (0, message.References.Count, "References has not been cleared.");
+			Assert.IsNull (message.InReplyTo, "In-Reply-To has not been cleared.");
+
+			Assert.IsNull (message.MimeVersion, "MIME-Version has not been cleared.");
+		}
+
+		[Test]
+		public void TestHtmlAndTextBodies ()
+		{
+			const string HtmlBody = "<html>This is an <b>html</b> body.</html>";
+			const string TextBody = "This is the text body.";
+			MimeMessage message;
+
+			message = MimeMessage.Load (Path.Combine ("..", "..", "TestData", "messages", "body.1.txt"));
+			Assert.AreEqual (TextBody, message.TextBody, "The text bodies do not match for body.1.txt.");
+			Assert.AreEqual (null, message.HtmlBody, "The HTML bodies do not match for body.1.txt.");
+
+			message = MimeMessage.Load (Path.Combine ("..", "..", "TestData", "messages", "body.2.txt"));
+			Assert.AreEqual (null, message.TextBody, "The text bodies do not match for body.2.txt.");
+			Assert.AreEqual (HtmlBody, message.HtmlBody, "The HTML bodies do not match for body.2.txt.");
+
+			message = MimeMessage.Load (Path.Combine ("..", "..", "TestData", "messages", "body.3.txt"));
+			Assert.AreEqual (TextBody, message.TextBody, "The text bodies do not match for body.3.txt.");
+			Assert.AreEqual (HtmlBody, message.HtmlBody, "The HTML bodies do not match for body.3.txt.");
+
+			message = MimeMessage.Load (Path.Combine ("..", "..", "TestData", "messages", "body.4.txt"));
+			Assert.AreEqual (null, message.TextBody, "The text bodies do not match for body.4.txt.");
+			Assert.AreEqual (HtmlBody, message.HtmlBody, "The HTML bodies do not match for body.4.txt.");
+
+			message = MimeMessage.Load (Path.Combine ("..", "..", "TestData", "messages", "body.5.txt"));
+			Assert.AreEqual (TextBody, message.TextBody, "The text bodies do not match for body.5.txt.");
+			Assert.AreEqual (HtmlBody, message.HtmlBody, "The HTML bodies do not match for body.5.txt.");
+
+			message = MimeMessage.Load (Path.Combine ("..", "..", "TestData", "messages", "body.6.txt"));
+			Assert.AreEqual (TextBody, message.TextBody, "The text bodies do not match for body.6.txt.");
+			Assert.AreEqual (HtmlBody, message.HtmlBody, "The HTML bodies do not match for body.6.txt.");
+
+			message = MimeMessage.Load (Path.Combine ("..", "..", "TestData", "messages", "body.7.txt"));
+			Assert.AreEqual (TextBody, message.TextBody, "The text bodies do not match for body.7.txt.");
+			Assert.AreEqual (HtmlBody, message.HtmlBody, "The HTML bodies do not match for body.7.txt.");
+
+			message = MimeMessage.Load (Path.Combine ("..", "..", "TestData", "messages", "body.8.txt"));
+			Assert.AreEqual (TextBody, message.TextBody, "The text bodies do not match for body.8.txt.");
+			Assert.AreEqual (null, message.HtmlBody, "The HTML bodies do not match for body.8.txt.");
+
+			message = MimeMessage.Load (Path.Combine ("..", "..", "TestData", "messages", "body.9.txt"));
+			Assert.AreEqual (null, message.TextBody, "The text bodies do not match for body.9.txt.");
+			Assert.AreEqual (HtmlBody, message.HtmlBody, "The HTML bodies do not match for body.9.txt.");
 		}
 	}
 }

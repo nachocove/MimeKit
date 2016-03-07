@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2014 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -71,7 +71,7 @@ namespace UnitTests {
 		}
 
 		[Test]
-		public void TestMultipartParameterExampleFromRfc2184 ()
+		public void TestMultipartParameterExampleFromRfc2231 ()
 		{
 			const string text = "message/external-body; access-type=URL;\n      URL*0=\"ftp://\";\n      URL*1=\"cs.utk.edu/pub/moore/bulk-mailer/bulk-mailer.tar\"";
 			ContentType type;
@@ -108,11 +108,11 @@ namespace UnitTests {
 
 			Assert.IsFalse (ContentType.TryParse (text, out type), "Content-Type should have failed to parse");
 			Assert.IsNotNull (type, "ContentType should not be null");
-			Assert.IsTrue (type.Matches ("text", "plain"), "ContenType should match text/plain");
+			Assert.IsTrue (type.IsMimeType ("text", "plain"), "ContenType should match text/plain");
 		}
 
 		[Test]
-		public void TestEncodedParameterExampleFromRfc2184 ()
+		public void TestEncodedParameterExampleFromRfc2231 ()
 		{
 			const string text = "application/x-stuff;\n      title*=us-ascii'en-us'This%20is%20%2A%2A%2Afun%2A%2A%2A";
 			ContentType type;
@@ -126,7 +126,7 @@ namespace UnitTests {
 		}
 
 		[Test]
-		public void TestMultipartEncodedParameterExampleFromRfc2184 ()
+		public void TestMultipartEncodedParameterExampleFromRfc2231 ()
 		{
 			const string text = "application/x-stuff;\n    title*1*=us-ascii'en'This%20is%20even%20more%20;\n    title*2*=%2A%2A%2Afun%2A%2A%2A%20;\n    title*3=\"isn't it!\"";
 			ContentType type;
@@ -156,16 +156,32 @@ namespace UnitTests {
 		[Test]
 		public void TestBreakingOfLongParamValues ()
 		{
-			string expected = "Content-Type: text/plain; charset=iso-8859-1;\n\tname*0=\"this is a really really long filename that should force MimeKit to b\";\n\tname*1=\"reak it apart - yay!.html\"";
-
-			if (FormatOptions.Default.NewLineFormat != NewLineFormat.Unix)
-				expected = expected.Replace ("\n", "\r\n");
+			const string expected = " text/plain; charset=iso-8859-1;\n\tname*0=\"this is a really really long filename that should force MimeKit to b\";\n\tname*1=\"reak it apart - yay!.html\"\n";
+			var format = FormatOptions.Default.Clone ();
+			format.NewLineFormat = NewLineFormat.Unix;
 
 			var type = new ContentType ("text", "plain");
 			type.Parameters.Add ("charset", "iso-8859-1");
 			type.Parameters.Add ("name", "this is a really really long filename that should force MimeKit to break it apart - yay!.html");
 
-			var encoded = type.ToString (Encoding.UTF8, true);
+			var encoded = type.Encode (format, Encoding.UTF8);
+
+			Assert.AreEqual (expected, encoded, "Encoded Content-Type does not match: {0}", expected);
+		}
+
+		[Test]
+		public void TestBreakingOfLongParamValues2047 ()
+		{
+			const string expected = " text/plain; charset=iso-8859-1; name=\"=?us-ascii?q?this_is_?=\n\t=?us-ascii?q?a_really_really_long_filename_that_should_force_MimeKit_to_?=\n\t=?us-ascii?q?break_it_apart_-_yay!=2Ehtml?=\"\n";
+			var format = FormatOptions.Default.Clone ();
+			format.ParameterEncodingMethod = ParameterEncodingMethod.Rfc2047;
+			format.NewLineFormat = NewLineFormat.Unix;
+
+			var type = new ContentType ("text", "plain");
+			type.Parameters.Add ("charset", "iso-8859-1");
+			type.Parameters.Add ("name", "this is a really really long filename that should force MimeKit to break it apart - yay!.html");
+
+			var encoded = type.Encode (format, Encoding.UTF8);
 
 			Assert.AreEqual (expected, encoded, "Encoded Content-Type does not match: {0}", expected);
 		}
@@ -173,16 +189,32 @@ namespace UnitTests {
 		[Test]
 		public void TestEncodingOfParamValues ()
 		{
-			string expected = "Content-Type: text/plain; charset=iso-8859-1;\n\tname*=iso-8859-1''Kristoffer%20Br%E5nemyr";
-
-			if (FormatOptions.Default.NewLineFormat != NewLineFormat.Unix)
-				expected = expected.Replace ("\n", "\r\n");
+			const string expected = " text/plain; charset=iso-8859-1;\n\tname*=iso-8859-1''Kristoffer%20Br%E5nemyr\n";
+			var format = FormatOptions.Default.Clone ();
+			format.NewLineFormat = NewLineFormat.Unix;
 
 			var type = new ContentType ("text", "plain");
 			type.Parameters.Add ("charset", "iso-8859-1");
 			type.Parameters.Add ("name", "Kristoffer Brånemyr");
 
-			var encoded = type.ToString (Encoding.UTF8, true);
+			var encoded = type.Encode (format, Encoding.UTF8);
+
+			Assert.AreEqual (expected, encoded, "Encoded Content-Type does not match: {0}", expected);
+		}
+
+		[Test]
+		public void TestEncodingOfParamValues2047 ()
+		{
+			const string expected = " text/plain; charset=iso-8859-1;\n\tname=\"=?iso-8859-1?q?Kristoffer_Br=E5nemyr?=\"\n";
+			var format = FormatOptions.Default.Clone ();
+			format.ParameterEncodingMethod = ParameterEncodingMethod.Rfc2047;
+			format.NewLineFormat = NewLineFormat.Unix;
+
+			var type = new ContentType ("text", "plain");
+			type.Parameters.Add ("charset", "iso-8859-1");
+			type.Parameters.Add ("name", "Kristoffer Brånemyr");
+
+			var encoded = type.Encode (format, Encoding.UTF8);
 
 			Assert.AreEqual (expected, encoded, "Encoded Content-Type does not match: {0}", expected);
 		}
@@ -190,16 +222,32 @@ namespace UnitTests {
 		[Test]
 		public void TestEncodingOfLongParamValues ()
 		{
-			string expected = "Content-Type: text/plain; charset=utf-8;\n\tname*0*=iso-8859-1''%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5;\n\tname*1*=%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5";
-
-			if (FormatOptions.Default.NewLineFormat != NewLineFormat.Unix)
-				expected = expected.Replace ("\n", "\r\n");
+			const string expected = " text/plain; charset=utf-8;\n\tname*0*=iso-8859-1''%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5;\n\tname*1*=%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5%E5\n";
+			var format = FormatOptions.Default.Clone ();
+			format.NewLineFormat = NewLineFormat.Unix;
 
 			var type = new ContentType ("text", "plain");
 			type.Parameters.Add ("charset", "utf-8");
 			type.Parameters.Add ("name", new string ('å', 40));
 
-			var encoded = type.ToString (Encoding.UTF8, true);
+			var encoded = type.Encode (format, Encoding.UTF8);
+
+			Assert.AreEqual (expected, encoded, "Encoded Content-Type does not match: {0}", expected);
+		}
+
+		[Test]
+		public void TestEncodingOfLongParamValues2047 ()
+		{
+			const string expected = " text/plain; charset=utf-8; name=\"=?iso-8859-1?b?5eXl5eXl?=\n\t=?iso-8859-1?b?5eXl5eXl5eXl5eXl5eXl5eXl5eXl5eXl5eXl5eXl5eXl5Q==?=\"\n";
+			var format = FormatOptions.Default.Clone ();
+			format.ParameterEncodingMethod = ParameterEncodingMethod.Rfc2047;
+			format.NewLineFormat = NewLineFormat.Unix;
+
+			var type = new ContentType ("text", "plain");
+			type.Parameters.Add ("charset", "utf-8");
+			type.Parameters.Add ("name", new string ('å', 40));
+
+			var encoded = type.Encode (format, Encoding.UTF8);
 
 			Assert.AreEqual (expected, encoded, "Encoded Content-Type does not match: {0}", expected);
 		}
@@ -242,6 +290,17 @@ namespace UnitTests {
 			Assert.IsNotNull (type.Parameters, "Parameter list is null: {0}", text);
 			Assert.IsTrue (type.Parameters.Contains ("name"), "Parameter list does not contain name param: {0}", text);
 			Assert.AreEqual (type.Parameters["name"], "Test Name.pdf", "name values do not match: {0}", text);
+		}
+
+		[Test]
+		public void TestMimeTypeWithoutSubtype ()
+		{
+			const string text = "application-x-gzip; name=document.xml.gz";
+			ContentType type;
+
+			// this should fail due to the missing subtype
+			Assert.IsFalse (ContentType.TryParse (text, out type), "Should not have parsed: {0}", text);
+			Assert.IsNull (type, "The content type should be null.");
 		}
 	}
 }

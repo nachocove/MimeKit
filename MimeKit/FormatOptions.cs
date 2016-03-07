@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -65,8 +65,12 @@ namespace MimeKit {
 			new byte[] { (byte) '\n' }, new byte[] { (byte) '\r', (byte) '\n' }
 		};
 
+		internal const int MaximumLineLength = 998;
+		internal const int MinimumLineLength = 60;
+
 		const int DefaultMaxLineLength = 78;
 
+		ParameterEncodingMethod parameterEncodingMethod;
 		bool allowMixedHeaderCharsets;
 		NewLineFormat newLineFormat;
 		bool international;
@@ -114,13 +118,13 @@ namespace MimeKit {
 			}
 		}
 
-		internal IMimeFilter CreateNewLineFilter ()
+		internal IMimeFilter CreateNewLineFilter (bool ensureNewLine = false)
 		{
 			switch (NewLineFormat) {
 			case NewLineFormat.Unix:
-				return new Dos2UnixFilter ();
+				return new Dos2UnixFilter (ensureNewLine);
 			default:
-				return new Unix2DosFilter ();
+				return new Unix2DosFilter (ensureNewLine);
 			}
 		}
 
@@ -151,10 +155,13 @@ namespace MimeKit {
 		/// Gets or sets whether the new "Internationalized Email" formatting standards should be used.
 		/// </summary>
 		/// <remarks>
-		/// <para>The new "Internationalized Email" format is defined by rfc6530 and rfc6532.</para>
+		/// <para>The new "Internationalized Email" format is defined by
+		/// <a href="https://tools.ietf.org/html/rfc6530">rfc6530</a> and
+		/// <a href="https://tools.ietf.org/html/rfc6532">rfc6532</a>.</para>
 		/// <para>This feature should only be used when formatting messages meant to be sent via
-		/// SMTP using the SMTPUTF8 extension (rfc6531) or when appending messages to an IMAP folder
-		/// via UTF8 APPEND (rfc6855).</para>
+		/// SMTP using the SMTPUTF8 extension (<a href="https://tools.ietf.org/html/rfc6531">rfc6531</a>)
+		/// or when appending messages to an IMAP folder via UTF8 APPEND
+		/// (<a href="https://tools.ietf.org/html/rfc6855">rfc6855</a>).</para>
 		/// </remarks>
 		/// <value><c>true</c> if the new internationalized formatting should be used; otherwise, <c>false</c>.</value>
 		/// <exception cref="System.InvalidOperationException">
@@ -174,14 +181,16 @@ namespace MimeKit {
 		/// Gets or sets whether the formatter should allow mixed charsets in the headers.
 		/// </summary>
 		/// <remarks>
-		/// <para>When this option is enabled, the MIME formatter will try to use ISO-8859-1
-		/// to encode headers when appropriate rather than being forced to use the specified
-		/// charset for all encoded-word tokens in order to maximize readability.</para>
+		/// <para>When this option is enabled, the MIME formatter will try to use US-ASCII and/or
+		/// ISO-8859-1 to encode headers when appropriate rather than being forced to use the
+		/// specified charset for all encoded-word tokens in order to maximize readability.</para>
 		/// <para>Unfortunately, mail clients like Outlook and Thunderbird do not treat
 		/// encoded-word tokens individually and assume that all tokens are encoded using the
 		/// charset declared in the first encoded-word token despite the specification
 		/// explicitly stating that each encoded-word token should be treated independently.</para>
-		/// <para>The Thunderbird bug can be tracked at https://bugzilla.mozilla.org/show_bug.cgi?id=317263</para>
+		/// <para>The Thunderbird bug can be tracked at
+		/// <a href="https://bugzilla.mozilla.org/show_bug.cgi?id=317263">
+		/// https://bugzilla.mozilla.org/show_bug.cgi?id=317263</a>.</para>
 		/// </remarks>
 		/// <value><c>true</c> if the formatter should be allowed to use ISO-8859-1 when encoding headers; otherwise, <c>false</c>.</value>
 		public bool AllowMixedHeaderCharsets {
@@ -191,6 +200,40 @@ namespace MimeKit {
 					throw new InvalidOperationException ("The default formatting options cannot be changed.");
 
 				allowMixedHeaderCharsets = value;
+			}
+		}
+
+		/// <summary>
+		/// The method to use for encoding Content-Type and Content-Disposition parameter values.
+		/// </summary>
+		/// <remarks>
+		/// <para>The method to use for encoding Content-Type and Content-Disposition parameter
+		/// values when the <see cref="Parameter.EncodingMethod"/> is set to
+		/// <see cref="MimeKit.ParameterEncodingMethod.Default"/>.</para>
+		/// <para>The MIME specifications specify that the proper method for encoding Content-Type
+		/// and Content-Disposition parameter values is the method described in
+		/// <a href="https://tools.ietf.org/html/rfc2231">rfc2231</a>. However, it is common for
+		/// some older email clients to improperly encode using the method described in
+		/// <a href="https://tools.ietf.org/html/rfc2047">rfc2047</a> instead.</para>
+		/// </remarks>
+		/// <value>The parameter encoding method that will be used.</value>
+		/// <exception cref="System.ArgumentOutOfRangeException">
+		/// <paramref name="value"/> is not a valid value.
+		/// </exception>
+		public ParameterEncodingMethod ParameterEncodingMethod {
+			get { return parameterEncodingMethod; }
+			set {
+				if (this == Default)
+					throw new InvalidOperationException ("The default formatting options cannot be changed.");
+
+				switch (value) {
+				case ParameterEncodingMethod.Rfc2047:
+				case ParameterEncodingMethod.Rfc2231:
+					parameterEncodingMethod = value;
+					break;
+				default:
+					throw new ArgumentOutOfRangeException ("value");
+				}
 			}
 		}
 
@@ -209,6 +252,7 @@ namespace MimeKit {
 		public FormatOptions ()
 		{
 			HiddenHeaders = new HashSet<HeaderId> ();
+			parameterEncodingMethod = ParameterEncodingMethod.Rfc2231;
 			//maxLineLength = DefaultMaxLineLength;
 			allowMixedHeaderCharsets = true;
 			international = false;
@@ -233,6 +277,7 @@ namespace MimeKit {
 			options.newLineFormat = newLineFormat;
 			options.HiddenHeaders = new HashSet<HeaderId> (HiddenHeaders);
 			options.allowMixedHeaderCharsets = allowMixedHeaderCharsets;
+			options.parameterEncodingMethod = parameterEncodingMethod;
 			options.international = international;
 			return options;
 		}

@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -28,6 +28,7 @@ using System;
 using System.IO;
 using System.Data;
 using System.Text;
+using System.Data.Common;
 
 #if __MOBILE__
 using Mono.Data.Sqlite;
@@ -59,14 +60,28 @@ namespace MimeKit.Cryptography {
 		// assembly.
 		static SqliteCertificateDatabase ()
 		{
-#if !__MOBILE__
+#if COREFX
+			try {
+				if ((sqliteAssembly = Assembly.Load (new AssemblyName ("Microsoft.Data.Sqlite"))) != null) {
+					sqliteConnectionClass = sqliteAssembly.GetType ("Microsoft.Data.Sqlite.SqliteConnection");
+					sqliteConnectionStringBuilderClass = sqliteAssembly.GetType ("Microsoft.Data.Sqlite.SqliteConnectionStringBuilder");
+
+					// Make sure that the runtime can load the native sqlite library
+					var builder = Activator.CreateInstance (sqliteConnectionStringBuilderClass);
+
+					IsAvailable = true;
+				}
+			} catch (FileNotFoundException) {
+			} catch (FileLoadException) {
+			} catch (BadImageFormatException) {
+			}
+#elif !__MOBILE__
 			var platform = Environment.OSVersion.Platform;
 
 			try {
 				// Mono.Data.Sqlite will only work on Unix-based platforms and 32-bit Windows platforms.
 				if (platform == PlatformID.Unix || platform == PlatformID.MacOSX || IntPtr.Size == 4) {
-					sqliteAssembly = Assembly.Load ("Mono.Data.Sqlite");
-					if (sqliteAssembly != null) {
+					if ((sqliteAssembly = Assembly.Load ("Mono.Data.Sqlite")) != null) {
 						sqliteConnectionClass = sqliteAssembly.GetType ("Mono.Data.Sqlite.SqliteConnection");
 						sqliteConnectionStringBuilderClass = sqliteAssembly.GetType ("Mono.Data.Sqlite.SqliteConnectionStringBuilder");
 
@@ -80,8 +95,7 @@ namespace MimeKit.Cryptography {
 
 				// System.Data.Sqlite is only available for Windows-based platforms.
 				if (!IsAvailable && platform != PlatformID.Unix && platform != PlatformID.MacOSX) {
-					sqliteAssembly = Assembly.Load ("System.Data.SQLite");
-					if (sqliteAssembly != null) {
+					if ((sqliteAssembly = Assembly.Load ("System.Data.SQLite")) != null) {
 						sqliteConnectionClass = sqliteAssembly.GetType ("System.Data.SQLite.SQLiteConnection");
 						sqliteConnectionStringBuilderClass = sqliteAssembly.GetType ("System.Data.SQLite.SQLiteConnectionStringBuilder");
 
@@ -105,7 +119,7 @@ namespace MimeKit.Cryptography {
 			get; private set;
 		}
 
-		static IDbConnection CreateConnection (string fileName)
+		static DbConnection CreateConnection (string fileName)
 		{
 			if (fileName == null)
 				throw new ArgumentNullException ("fileName");
@@ -114,23 +128,39 @@ namespace MimeKit.Cryptography {
 				throw new ArgumentException ("The file name cannot be empty.", "fileName");
 
 #if !__MOBILE__
+			var dateTimeFormat = sqliteConnectionStringBuilderClass.GetProperty ("DateTimeFormat");
 			var builder = Activator.CreateInstance (sqliteConnectionStringBuilderClass);
-			sqliteConnectionStringBuilderClass.GetProperty ("DateTimeFormat").SetValue (builder, 0, null);
+
 			sqliteConnectionStringBuilderClass.GetProperty ("DataSource").SetValue (builder, fileName, null);
 
-			if (!File.Exists (fileName))
-				sqliteConnectionClass.GetMethod ("CreateFile").Invoke (null, new [] {fileName});
+			if (dateTimeFormat != null)
+				dateTimeFormat.SetValue (builder, 0, null);
+
+			if (!File.Exists (fileName)) {
+				var dir = Path.GetDirectoryName (fileName);
+
+				if (!string.IsNullOrEmpty (dir) && !Directory.Exists (dir))
+					Directory.CreateDirectory (dir);
+
+				File.Create (fileName).Dispose ();
+			}
 
 			var connectionString = (string) sqliteConnectionStringBuilderClass.GetProperty ("ConnectionString").GetValue (builder, null);
 
-			return (IDbConnection) Activator.CreateInstance (sqliteConnectionClass, new [] { connectionString });
+			return (DbConnection) Activator.CreateInstance (sqliteConnectionClass, new [] { connectionString });
 #else
 			var builder = new SqliteConnectionStringBuilder ();
 			builder.DateTimeFormat = SQLiteDateFormats.Ticks;
 			builder.DataSource = fileName;
 
-			if (!File.Exists (fileName))
+			if (!File.Exists (fileName)) {
+				var dir = Path.GetDirectoryName (fileName);
+
+				if (!string.IsNullOrEmpty (dir) && !Directory.Exists (dir))
+					Directory.CreateDirectory (dir);
+
 				SqliteConnection.CreateFile (fileName);
+			}
 
 			return new SqliteConnection (builder.ConnectionString);
 #endif
@@ -145,7 +175,7 @@ namespace MimeKit.Cryptography {
 		/// SQLite library.</para>
 		/// <para>If Mono.Data.Sqlite is not available or if an alternative binding to the native
 		/// SQLite library is preferred, then consider using
-		/// <see cref="SqliteCertificateDatabase(System.Data.IDbConnection,string)"/> instead.</para>
+		/// <see cref="SqlCertificateDatabase(System.Data.Common.DbConnection,string)"/> instead.</para>
 		/// </remarks>
 		/// <param name="fileName">The file name.</param>
 		/// <param name="password">The password used for encrypting and decrypting the private keys.</param>
@@ -180,7 +210,7 @@ namespace MimeKit.Cryptography {
 		/// <para>-or-</para>
 		/// <para><paramref name="password"/> is <c>null</c>.</para>
 		/// </exception>
-		public SqliteCertificateDatabase (IDbConnection connection, string password) : base (connection, password)
+		public SqliteCertificateDatabase (DbConnection connection, string password) : base (connection, password)
 		{
 		}
 
@@ -191,9 +221,9 @@ namespace MimeKit.Cryptography {
 		/// Constructs the command to create a certificates table suitable for storing
 		/// <see cref="X509CertificateRecord"/> objects.
 		/// </remarks>
-		/// <returns>The <see cref="System.Data.IDbCommand"/>.</returns>
-		/// <param name="connection">The <see cref="System.Data.IDbConnection"/>.</param>
-		protected override IDbCommand GetCreateCertificatesTableCommand (IDbConnection connection)
+		/// <returns>The <see cref="System.Data.Common.DbCommand"/>.</returns>
+		/// <param name="connection">The <see cref="System.Data.Common.DbConnection"/>.</param>
+		protected override DbCommand GetCreateCertificatesTableCommand (DbConnection connection)
 		{
 			var statement = new StringBuilder ("CREATE TABLE IF NOT EXISTS CERTIFICATES(");
 			var columns = X509CertificateRecord.ColumnNames;
@@ -238,9 +268,9 @@ namespace MimeKit.Cryptography {
 		/// Constructs the command to create a CRLs table suitable for storing
 		/// <see cref="X509CertificateRecord"/> objects.
 		/// </remarks>
-		/// <returns>The <see cref="System.Data.IDbCommand"/>.</returns>
-		/// <param name="connection">The <see cref="System.Data.IDbConnection"/>.</param>
-		protected override IDbCommand GetCreateCrlsTableCommand (IDbConnection connection)
+		/// <returns>The <see cref="System.Data.Common.DbCommand"/>.</returns>
+		/// <param name="connection">The <see cref="System.Data.Common.DbConnection"/>.</param>
+		protected override DbCommand GetCreateCrlsTableCommand (DbConnection connection)
 		{
 			var statement = new StringBuilder ("CREATE TABLE IF NOT EXISTS CRLS(");
 			var columns = X509CrlRecord.ColumnNames;

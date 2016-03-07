@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -73,8 +73,8 @@ namespace MimeKit.Text {
 		/// </summary>
 		/// <remarks>
 		/// <para>Gets or sets whether or not the tokenizer should decode character references.</para>
-		/// <para>Note: Character references in attribute values will still be decoded even if this
-		/// value is set to <c>false</c>.</para>
+		/// <para><alert class="warning">Character references in attribute values will still be decoded
+		/// even if this value is set to <c>false</c>.</alert></para>
 		/// </remarks>
 		/// <value><c>true</c> if character references should be decoded; otherwise, <c>false</c>.</value>
 		public bool DecodeCharacterReferences {
@@ -349,11 +349,11 @@ namespace MimeKit.Text {
 				switch (tag.Id) {
 				case HtmlTagId.Style: case HtmlTagId.Xmp: case HtmlTagId.IFrame: case HtmlTagId.NoEmbed: case HtmlTagId.NoFrames:
 					TokenizerState = HtmlTokenizerState.RawText;
-					activeTagName = tag.Name;
+					activeTagName = tag.Name.ToLowerInvariant ();
 					break;
 				case HtmlTagId.Title: case HtmlTagId.TextArea:
 					TokenizerState = HtmlTokenizerState.RcData;
-					activeTagName = tag.Name;
+					activeTagName = tag.Name.ToLowerInvariant ();
 					break;
 				case HtmlTagId.PlainText:
 					TokenizerState = HtmlTokenizerState.PlainText;
@@ -364,7 +364,7 @@ namespace MimeKit.Text {
 				case HtmlTagId.NoScript:
 					// TODO: only switch into the RawText state if scripting is enabled
 					TokenizerState = HtmlTokenizerState.RawText;
-					activeTagName = tag.Name;
+					activeTagName = tag.Name.ToLowerInvariant ();
 					break;
 				case HtmlTagId.Html:
 					TokenizerState = HtmlTokenizerState.Data;

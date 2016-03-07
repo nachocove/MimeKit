@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -196,6 +196,7 @@ namespace MimeKit.Cryptography {
 			}
 		}
 
+#if !PORTABLE
 		/// <summary>
 		/// Imports the certificate(s) from the specified file.
 		/// </summary>
@@ -220,6 +221,7 @@ namespace MimeKit.Cryptography {
 			using (var stream = File.OpenRead (fileName))
 				Import (stream);
 		}
+#endif
 
 		/// <summary>
 		/// Imports the certificate(s) from the specified byte array.
@@ -287,6 +289,7 @@ namespace MimeKit.Cryptography {
 			}
 		}
 
+#if !PORTABLE
 		/// <summary>
 		/// Imports certificates and private keys from the specified file.
 		/// </summary>
@@ -301,7 +304,9 @@ namespace MimeKit.Cryptography {
 		/// <para><paramref name="password"/> is <c>null</c>.</para>
 		/// </exception>
 		/// <exception cref="System.ArgumentException">
-		/// The specified file path is empty.
+		/// <paramref name="fileName"/> is a zero-length string, contains only white space, or
+		/// contains one or more invalid characters as defined by
+		/// <see cref="System.IO.Path.InvalidPathChars"/>.
 		/// </exception>
 		/// <exception cref="System.IO.FileNotFoundException">
 		/// The specified file could not be found.
@@ -317,12 +322,10 @@ namespace MimeKit.Cryptography {
 			if (fileName == null)
 				throw new ArgumentNullException ("fileName");
 
-			if (string.IsNullOrEmpty (fileName))
-				throw new ArgumentException ("The specified path is empty.", "fileName");
-
 			using (var stream = File.OpenRead (fileName))
 				Import (stream, password);
 		}
+#endif
 
 		/// <summary>
 		/// Imports certificates and private keys from the specified byte array.
@@ -370,6 +373,7 @@ namespace MimeKit.Cryptography {
 			}
 		}
 
+#if !PORTABLE
 		/// <summary>
 		/// Exports the certificates to an unencrypted file.
 		/// </summary>
@@ -381,7 +385,9 @@ namespace MimeKit.Cryptography {
 		/// <paramref name="fileName"/> is <c>null</c>.
 		/// </exception>
 		/// <exception cref="System.ArgumentException">
-		/// The specified file path is empty.
+		/// <paramref name="fileName"/> is a zero-length string, contains only white space, or
+		/// contains one or more invalid characters as defined by
+		/// <see cref="System.IO.Path.InvalidPathChars"/>.
 		/// </exception>
 		/// <exception cref="System.IO.PathTooLongException">
 		/// The specified path exceeds the maximum allowed path length of the system.
@@ -400,12 +406,10 @@ namespace MimeKit.Cryptography {
 			if (fileName == null)
 				throw new ArgumentNullException ("fileName");
 
-			if (string.IsNullOrEmpty (fileName))
-				throw new ArgumentException ("The specified path is empty.", "fileName");
-
 			using (var file = File.Create (fileName))
 				Export (file);
 		}
+#endif
 
 		/// <summary>
 		/// Exports the specified stream and password to a pkcs12 encrypted file.
@@ -464,6 +468,7 @@ namespace MimeKit.Cryptography {
 			store.Save (stream, password.ToCharArray (), new SecureRandom ());
 		}
 
+#if !PORTABLE
 		/// <summary>
 		/// Exports the specified stream and password to a pkcs12 encrypted file.
 		/// </summary>
@@ -478,7 +483,9 @@ namespace MimeKit.Cryptography {
 		/// <para><paramref name="password"/> is <c>null</c>.</para>
 		/// </exception>
 		/// <exception cref="System.ArgumentException">
-		/// The specified file path is empty.
+		/// <paramref name="fileName"/> is a zero-length string, contains only white space, or
+		/// contains one or more invalid characters as defined by
+		/// <see cref="System.IO.Path.InvalidPathChars"/>.
 		/// </exception>
 		/// <exception cref="System.IO.PathTooLongException">
 		/// The specified path exceeds the maximum allowed path length of the system.
@@ -497,15 +504,13 @@ namespace MimeKit.Cryptography {
 			if (fileName == null)
 				throw new ArgumentNullException ("fileName");
 
-			if (string.IsNullOrEmpty (fileName))
-				throw new ArgumentException ("The specified path is empty.", "fileName");
-
 			if (password == null)
 				throw new ArgumentNullException ("password");
 
 			using (var file = File.Create (fileName))
 				Export (file, password);
 		}
+#endif
 
 		/// <summary>
 		/// Gets an enumerator of matching X.509 certificates based on the specified selector.

@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc.
+// Copyright (c) 2013-2016 Xamarin Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -133,6 +133,7 @@ namespace MimeKit {
 		{
 			ContentType.Parameters["boundary"] = GenerateBoundary ();
 			children = new List<MimeEntity> ();
+			WriteEndBoundary = true;
 		}
 
 		/// <summary>
@@ -205,17 +206,19 @@ namespace MimeKit {
 				return preamble;
 			}
 			set {
-				if (preamble == value)
+				if (Preamble == value)
 					return;
 
 				if (value != null) {
-					var folded = FoldPreambleOrEpilogue (FormatOptions.Default, value);
+					var folded = FoldPreambleOrEpilogue (FormatOptions.Default, value, false);
 					RawPreamble = Encoding.UTF8.GetBytes (folded);
 					preamble = folded;
 				} else {
 					RawPreamble = null;
 					preamble = null;
 				}
+
+				WriteEndBoundary = true;
 			}
 		}
 
@@ -227,42 +230,66 @@ namespace MimeKit {
 		/// Gets or sets the epilogue.
 		/// </summary>
 		/// <remarks>
-		/// A multipart epiloque is the text that ppears after the last
-		/// child of the multipart and is rarely ever used.
+		/// A multipart epiloque is the text that appears after the closing boundary
+		/// of the multipart and is typically either empty or a single new line
+		/// character sequence.
 		/// </remarks>
 		/// <value>The epilogue.</value>
 		public string Epilogue {
 			get {
-				if (epilogue == null && RawEpilogue != null)
-					epilogue = CharsetUtils.ConvertToUnicode (Headers.Options, RawEpilogue, 0, RawEpilogue.Length);
+				if (epilogue == null && RawEpilogue != null) {
+					int index = 0;
+
+					// Note: In practice, the RawEpilogue contains the CRLF belonging to the end-boundary, but
+					// for sanity, we pretend that it doesn't.
+					if ((RawEpilogue.Length > 1 && RawEpilogue[0] == (byte) '\r' && RawEpilogue[1] == (byte) '\n'))
+						index += 2;
+					else if (RawEpilogue.Length > 1 && RawEpilogue[0] == (byte) '\n')
+						index++;
+
+					epilogue = CharsetUtils.ConvertToUnicode (Headers.Options, RawEpilogue, index, RawEpilogue.Length - index);
+				}
 
 				return epilogue;
 			}
 			set {
-				if (epilogue == value)
+				if (Epilogue == value)
 					return;
 
 				if (value != null) {
-					var folded = FoldPreambleOrEpilogue (FormatOptions.Default, value);
+					var folded = FoldPreambleOrEpilogue (FormatOptions.Default, value, true);
 					RawEpilogue = Encoding.UTF8.GetBytes (folded);
-					epilogue = folded;
+					epilogue = null;
 				} else {
 					RawEpilogue = null;
 					epilogue = null;
 				}
+
+				WriteEndBoundary = true;
 			}
+		}
+
+		/// <summary>
+		/// Gets or sets whether the end boundary should be written.
+		/// </summary>
+		/// <remarks>
+		/// Gets or sets whether the end boundary should be written.
+		/// </remarks>
+		/// <value><c>true</c> if the end boundary should be written; otherwise, <c>false</c>.</value>
+		internal bool WriteEndBoundary {
+			get; set;
 		}
 
 		/// <summary>
 		/// Dispatches to the specific visit method for this MIME entity.
 		/// </summary>
 		/// <remarks>
-		/// This default implementation for <see cref="MimeKit.MimeEntity"/> nodes
-		/// calls <see cref="MimeKit.MimeVisitor.VisitMimeEntity"/>. Override this
+		/// This default implementation for <see cref="MimeKit.Multipart"/> nodes
+		/// calls <see cref="MimeKit.MimeVisitor.VisitMultipart"/>. Override this
 		/// method to call into a more specific method on a derived visitor class
 		/// of the <see cref="MimeKit.MimeVisitor"/> class. However, it should still
 		/// support unknown visitors by calling
-		/// <see cref="MimeKit.MimeVisitor.VisitMimeEntity"/>.
+		/// <see cref="MimeKit.MimeVisitor.VisitMultipart"/>.
 		/// </remarks>
 		/// <param name="visitor">The visitor.</param>
 		/// <exception cref="System.ArgumentNullException">
@@ -276,12 +303,15 @@ namespace MimeKit {
 			visitor.VisitMultipart (this);
 		}
 
-		static string FoldPreambleOrEpilogue (FormatOptions options, string text)
+		internal static string FoldPreambleOrEpilogue (FormatOptions options, string text, bool isEpilogue)
 		{
 			var builder = new StringBuilder ();
 			int startIndex, wordIndex;
 			int lineLength = 0;
 			int index = 0;
+
+			if (isEpilogue)
+				builder.Append (options.NewLine);
 
 			while (index < text.Length) {
 				startIndex = index;
@@ -348,15 +378,15 @@ namespace MimeKit {
 		/// Prepares the MIME entity for transport using the specified encoding constraints.
 		/// </remarks>
 		/// <param name="constraint">The encoding constraint.</param>
-		/// <param name="maxLineLength">The maximum allowable length for a line (not counting the CRLF). Must be between <c>72</c> and <c>998</c> (inclusive).</param>
+		/// <param name="maxLineLength">The maximum number of octets allowed per line (not counting the CRLF). Must be between <c>60</c> and <c>998</c> (inclusive).</param>
 		/// <exception cref="System.ArgumentOutOfRangeException">
-		/// <para><paramref name="maxLineLength"/> is not between <c>72</c> and <c>998</c> (inclusive).</para>
+		/// <para><paramref name="maxLineLength"/> is not between <c>60</c> and <c>998</c> (inclusive).</para>
 		/// <para>-or-</para>
 		/// <para><paramref name="constraint"/> is not a valid value.</para>
 		/// </exception>
 		public override void Prepare (EncodingConstraint constraint, int maxLineLength = 78)
 		{
-			if (maxLineLength < 72 || maxLineLength > 998)
+			if (maxLineLength < FormatOptions.MinimumLineLength || maxLineLength > FormatOptions.MaximumLineLength)
 				throw new ArgumentOutOfRangeException ("maxLineLength");
 
 			for (int i = 0; i < children.Count; i++)
@@ -371,6 +401,7 @@ namespace MimeKit {
 		/// </remarks>
 		/// <param name="options">The formatting options.</param>
 		/// <param name="stream">The output stream.</param>
+		/// <param name="contentOnly"><c>true</c> if only the content should be written; otherwise, <c>false</c>.</param>
 		/// <param name="cancellationToken">A cancellation token.</param>
 		/// <exception cref="System.ArgumentNullException">
 		/// <para><paramref name="options"/> is <c>null</c>.</para>
@@ -383,14 +414,14 @@ namespace MimeKit {
 		/// <exception cref="System.IO.IOException">
 		/// An I/O error occurred.
 		/// </exception>
-		public override void WriteTo (FormatOptions options, Stream stream, CancellationToken cancellationToken = default (CancellationToken))
+		public override void WriteTo (FormatOptions options, Stream stream, bool contentOnly, CancellationToken cancellationToken = default (CancellationToken))
 		{
 			if (Boundary == null)
 				Boundary = GenerateBoundary ();
 
-			base.WriteTo (options, stream, cancellationToken);
+			base.WriteTo (options, stream, contentOnly, cancellationToken);
 
-			if (ContentType.Matches ("multipart", "signed")) {
+			if (ContentType.IsMimeType ("multipart", "signed")) {
 				// don't reformat the headers or content of any children of a multipart/signed
 				if (options.International || options.HiddenHeaders.Count > 0) {
 					options = options.Clone ();
@@ -408,26 +439,66 @@ namespace MimeKit {
 
 			if (cancellable != null) {
 				for (int i = 0; i < children.Count; i++) {
+					var msg = children[i] as MessagePart;
+					var multi = children[i] as Multipart;
+					var part = children[i] as MimePart;
+
 					cancellable.Write (boundary, 0, boundary.Length - 2, cancellationToken);
 					cancellable.Write (options.NewLineBytes, 0, options.NewLineBytes.Length, cancellationToken);
-					children[i].WriteTo (options, stream, cancellationToken);
+					children[i].WriteTo (options, stream, false, cancellationToken);
+
+					if (msg != null && msg.Message != null && msg.Message.Body != null) {
+						multi = msg.Message.Body as Multipart;
+						part = msg.Message.Body as MimePart;
+					}
+
+					if ((part != null && part.ContentObject == null) ||
+						(multi != null && !multi.WriteEndBoundary))
+						continue;
+
 					cancellable.Write (options.NewLineBytes, 0, options.NewLineBytes.Length, cancellationToken);
 				}
 
+				if (!WriteEndBoundary)
+					return;
+
 				cancellable.Write (boundary, 0, boundary.Length, cancellationToken);
-				cancellable.Write (options.NewLineBytes, 0, options.NewLineBytes.Length, cancellationToken);
+
+				if (RawEpilogue == null)
+					cancellable.Write (options.NewLineBytes, 0, options.NewLineBytes.Length, cancellationToken);
 			} else {
 				for (int i = 0; i < children.Count; i++) {
+					var msg = children[i] as MessagePart;
+					var multi = children[i] as Multipart;
+					var part = children[i] as MimePart;
+
 					cancellationToken.ThrowIfCancellationRequested ();
 					stream.Write (boundary, 0, boundary.Length - 2);
 					stream.Write (options.NewLineBytes, 0, options.NewLineBytes.Length);
-					children[i].WriteTo (options, stream, cancellationToken);
+					children[i].WriteTo (options, stream, false, cancellationToken);
+
+					if (msg != null && msg.Message != null && msg.Message.Body != null) {
+						multi = msg.Message.Body as Multipart;
+						part = msg.Message.Body as MimePart;
+					}
+
+					if ((part != null && part.ContentObject == null) ||
+						(multi != null && !multi.WriteEndBoundary))
+						continue;
+
 					stream.Write (options.NewLineBytes, 0, options.NewLineBytes.Length);
 				}
 
+				if (!WriteEndBoundary)
+					return;
+
 				cancellationToken.ThrowIfCancellationRequested ();
 				stream.Write (boundary, 0, boundary.Length);
-				stream.Write (options.NewLineBytes, 0, options.NewLineBytes.Length);
+
+				if (RawEpilogue == null) {
+					cancellationToken.ThrowIfCancellationRequested ();
+					stream.Write (options.NewLineBytes, 0, options.NewLineBytes.Length);
+				}
 			}
 
 			if (RawEpilogue != null && RawEpilogue.Length > 0)
@@ -473,6 +544,7 @@ namespace MimeKit {
 			if (part == null)
 				throw new ArgumentNullException ("part");
 
+			WriteEndBoundary = true;
 			children.Add (part);
 		}
 
@@ -484,6 +556,7 @@ namespace MimeKit {
 		/// </remarks>
 		public void Clear ()
 		{
+			WriteEndBoundary = true;
 			children.Clear ();
 		}
 
@@ -543,7 +616,12 @@ namespace MimeKit {
 			if (part == null)
 				throw new ArgumentNullException ("part");
 
-			return children.Remove (part);
+			if (!children.Remove (part))
+				return false;
+
+			WriteEndBoundary = true;
+
+			return true;
 		}
 
 		#endregion
@@ -592,6 +670,7 @@ namespace MimeKit {
 				throw new ArgumentNullException ("part");
 
 			children.Insert (index, part);
+			WriteEndBoundary = true;
 		}
 
 		/// <summary>
@@ -607,6 +686,7 @@ namespace MimeKit {
 		public void RemoveAt (int index)
 		{
 			children.RemoveAt (index);
+			WriteEndBoundary = true;
 		}
 
 		/// <summary>
@@ -629,6 +709,7 @@ namespace MimeKit {
 				if (value == null)
 					throw new ArgumentNullException ("value");
 
+				WriteEndBoundary = true;
 				children[index] = value;
 			}
 		}

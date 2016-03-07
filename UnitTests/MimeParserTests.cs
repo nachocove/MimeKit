@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2014 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -30,12 +30,16 @@ using System.Text;
 using NUnit.Framework;
 
 using MimeKit;
+using MimeKit.IO;
 using MimeKit.Utils;
+using MimeKit.IO.Filters;
 
 namespace UnitTests {
 	[TestFixture]
 	public class MimeParserTests
 	{
+		static string MessagesDataDir = Path.Combine ("..", "..", "TestData", "messages");
+		static string MboxDataDir = Path.Combine ("..", "..", "TestData", "mbox");
 		static FormatOptions UnixFormatOptions;
 
 		[SetUp]
@@ -129,7 +133,7 @@ namespace UnitTests {
 		[Test]
 		public void TestSimpleMbox ()
 		{
-			using (var stream = File.OpenRead ("../../TestData/mbox/simple.mbox.txt")) {
+			using (var stream = File.OpenRead (Path.Combine (MboxDataDir, "simple.mbox.txt"))) {
 				var parser = new MimeParser (stream, MimeFormat.Mbox);
 
 				while (!parser.IsEndOfStream) {
@@ -202,7 +206,7 @@ namespace UnitTests {
    Content-Type: text/plain
 ".Replace ("\r\n", "\n");
 
-			using (var stream = File.OpenRead ("../../TestData/messages/empty-multipart.txt")) {
+			using (var stream = File.OpenRead (Path.Combine (MessagesDataDir, "empty-multipart.txt"))) {
 				var parser = new MimeParser (stream, MimeFormat.Entity);
 				var message = parser.ParseMessage ();
 				var builder = new StringBuilder ();
@@ -216,11 +220,20 @@ namespace UnitTests {
 		[Test]
 		public void TestJwzMbox ()
 		{
-			var summary = File.ReadAllText ("../../TestData/mbox/jwz-summary.txt").Replace ("\r\n", "\n");
+			var summary = File.ReadAllText (Path.Combine (MboxDataDir, "jwz-summary.txt")).Replace ("\r\n", "\n");
+			var options = FormatOptions.Default.Clone ();
+			var original = new MemoryBlockStream ();
+			var output = new MemoryBlockStream ();
 			var builder = new StringBuilder ();
+			var expected = new byte[4096];
+			var buffer = new byte[4096];
+			int nx, n;
 
-			using (var stream = File.OpenRead ("../../TestData/mbox/jwz.mbox.txt")) {
+			options.NewLineFormat = NewLineFormat.Unix;
+
+			using (var stream = File.OpenRead (Path.Combine (MboxDataDir, "jwz.mbox.txt"))) {
 				var parser = new MimeParser (stream, MimeFormat.Mbox);
+				int count = 0;
 
 				while (!parser.IsEndOfStream) {
 					var message = parser.ParseMessage ();
@@ -234,6 +247,11 @@ namespace UnitTests {
 					builder.AppendFormat ("Date: {0}", DateUtils.FormatDate (message.Date)).Append ('\n');
 					DumpMimeTree (builder, message);
 					builder.Append ('\n');
+
+					var marker = Encoding.UTF8.GetBytes ((count > 0 ? "\n" : string.Empty) + parser.MboxMarker + "\n");
+					output.Write (marker, 0, marker.Length);
+					message.WriteTo (options, output);
+					count++;
 				}
 			}
 
@@ -245,16 +263,49 @@ namespace UnitTests {
 				actual = actual.Replace (iso2022jp, "佐藤豊");
 
 			Assert.AreEqual (summary, actual, "Summaries do not match for jwz.mbox");
+
+			using (var stream = File.OpenRead (Path.Combine (MboxDataDir, "jwz.mbox.txt"))) {
+				using (var filtered = new FilteredStream (original)) {
+					filtered.Add (new Dos2UnixFilter ());
+					stream.CopyTo (filtered);
+					filtered.Flush ();
+				}
+			}
+
+			original.Position = 0;
+			output.Position = 0;
+
+			Assert.AreEqual (original.Length, output.Length, "The length of the mbox did not match.");
+
+			do {
+				var position = original.Position;
+
+				nx = original.Read (expected, 0, expected.Length);
+				n = output.Read (buffer, 0, buffer.Length);
+
+				if (nx == 0)
+					break;
+
+				for (int i = 0; i < nx; i++) {
+					if (buffer[i] == expected[i])
+						continue;
+
+					var strExpected = CharsetUtils.Latin1.GetString (expected, 0, nx);
+					var strActual = CharsetUtils.Latin1.GetString (buffer, 0, n);
+
+					Assert.AreEqual (strExpected, strActual, "The mbox differs at position {0}", position + i);
+				}
+			} while (true);
 		}
 
 		[Test]
 		public void TestJwzPersistentMbox ()
 		{
-			var summary = File.ReadAllText ("../../TestData/mbox/jwz-summary.txt").Replace ("\r\n", "\n");
+			var summary = File.ReadAllText (Path.Combine (MboxDataDir, "jwz-summary.txt")).Replace ("\r\n", "\n");
 			var builder = new StringBuilder ();
 
-			using (var stream = File.OpenRead ("../../TestData/mbox/jwz.mbox.txt")) {
-				var parser = new MimeParser (stream, MimeFormat.Mbox);
+			using (var stream = File.OpenRead (Path.Combine (MboxDataDir, "jwz.mbox.txt"))) {
+				var parser = new MimeParser (stream, MimeFormat.Mbox, true);
 
 				while (!parser.IsEndOfStream) {
 					var message = parser.ParseMessage ();
@@ -271,7 +322,7 @@ namespace UnitTests {
 
 					// Force the various MimePart objects to write their content streams.
 					// The idea is that by forcing the MimeParts to seek in their content,
-					// we will test to make sure that parser correctly deals with it.
+					// we will test to make sure that the parser correctly deals with it.
 					message.WriteTo (Stream.Null);
 				}
 			}
@@ -292,11 +343,11 @@ namespace UnitTests {
 			const string subject = "日本語メールテスト (testing Japanese emails)";
 			const string body = "Let's see if both subject and body works fine...\n\n日本語が\n正常に\n送れているか\nテスト.\n";
 
-			using (var stream = File.OpenRead ("../../TestData/messages/japanese.txt")) {
+			using (var stream = File.OpenRead (Path.Combine (MessagesDataDir, "japanese.txt"))) {
 				var message = MimeMessage.Load (stream);
 
 				Assert.AreEqual (subject, message.Subject, "Subject values do not match");
-				Assert.AreEqual (body, message.TextBody, "Message text does not match.");
+				Assert.AreEqual (body, message.TextBody.Replace ("\r\n", "\n"), "Message text does not match.");
 			}
 		}
 
@@ -305,7 +356,7 @@ namespace UnitTests {
 		{
 			int count = 0;
 
-			using (var stream = File.OpenRead ("../../TestData/mbox/unmunged.mbox.txt")) {
+			using (var stream = File.OpenRead (Path.Combine (MboxDataDir, "unmunged.mbox.txt"))) {
 				var parser = new MimeParser (stream, MimeFormat.Mbox);
 
 				while (!parser.IsEndOfStream) {
@@ -324,6 +375,35 @@ namespace UnitTests {
 			}
 
 			Assert.AreEqual (4, count, "Expected to find 4 messages.");
+		}
+
+		[Test]
+		public void TestMultipartEpilogueWithText ()
+		{
+			const string epilogue = "Peter Urka <pcu@umich.edu>\nDept. of Chemistry, Univ. of Michigan\nNewt-thought is right-thought.  Go Newt!\n\n";
+
+			using (var stream = File.OpenRead (Path.Combine (MessagesDataDir, "epilogue.txt"))) {
+				var message = MimeMessage.Load (stream);
+				var multipart = message.Body as Multipart;
+
+				Assert.AreEqual (epilogue, multipart.Epilogue.Replace ("\r\n", "\n"), "The epilogue does not match");
+
+				Assert.IsTrue (multipart.RawEpilogue[0] == (byte) '\r' || multipart.RawEpilogue[0] == (byte) '\n',
+					"The RawEpilogue does not start with a new-line.");
+			}
+		}
+
+		[Test]
+		public void TestMissingSubtype ()
+		{
+			using (var stream = File.OpenRead (Path.Combine (MessagesDataDir, "missing-subtype.txt"))) {
+				var message = MimeMessage.Load (stream);
+				var type = message.Body.ContentType;
+
+				Assert.AreEqual ("application", type.MediaType, "The media type is not the default.");
+				Assert.AreEqual ("octet-stream", type.MediaSubtype, "The media subtype is not the default.");
+				Assert.AreEqual ("document.xml.gz", type.Name, "The parameters do not seem to have been parsed.");
+			}
 		}
 
 		[Test]

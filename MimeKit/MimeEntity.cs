@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc.
+// Copyright (c) 2013-2016 Xamarin Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -51,6 +51,7 @@ namespace MimeKit {
 	/// </remarks>
 	public abstract class MimeEntity
 	{
+		internal bool EnsureNewLine;
 		ContentDisposition disposition;
 		string contentId;
 		Uri location;
@@ -215,7 +216,7 @@ namespace MimeKit {
 		/// <para>The Content-Base header specifies the base URI for the <see cref="MimeEntity"/>
 		/// in cases where the <see cref="ContentLocation"/> is a relative URI.</para>
 		/// <para>The Content-Base URI must be an absolute URI.</para>
-		/// <para>For more information, see http://www.ietf.org/rfc/rfc2110.txt</para>
+		/// <para>For more information, see <a href="https://tools.ietf.org/html/rfc2110">rfc2110</a>.</para>
 		/// </remarks>
 		/// <value>The base content URI or <c>null</c>.</value>
 		/// <exception cref="System.ArgumentException">
@@ -249,7 +250,7 @@ namespace MimeKit {
 		/// within the same multipart/related container to reference this part by URI. This
 		/// can be useful, for example, when constructing an HTML message body that needs to
 		/// reference image attachments.</para>
-		/// <para>For more information, see http://www.ietf.org/rfc/rfc2110.txt</para>
+		/// <para>For more information, see <a href="https://tools.ietf.org/html/rfc2110">rfc2110</a>.</para>
 		/// </remarks>
 		/// <value>The content location or <c>null</c>.</value>
 		public Uri ContentLocation {
@@ -292,13 +293,13 @@ namespace MimeKit {
 				}
 
 				var buffer = Encoding.UTF8.GetBytes (value);
-				InternetAddress addr;
+				MailboxAddress mailbox;
 				int index = 0;
 
-				if (!InternetAddress.TryParse (Headers.Options, buffer, ref index, buffer.Length, false, out addr) || !(addr is MailboxAddress))
+				if (!MailboxAddress.TryParse (Headers.Options, buffer, ref index, buffer.Length, false, out mailbox))
 					throw new ArgumentException ("Invalid Content-Id format.");
 
-				contentId = ((MailboxAddress) addr).Address;
+				contentId = mailbox.Address;
 
 				SetHeader ("Content-Id", "<" + contentId + ">");
 			}
@@ -397,6 +398,7 @@ namespace MimeKit {
 		/// </remarks>
 		/// <param name="options">The formatting options.</param>
 		/// <param name="stream">The output stream.</param>
+		/// <param name="contentOnly"><c>true</c> if only the content should be written; otherwise, <c>false</c>.</param>
 		/// <param name="cancellationToken">A cancellation token.</param>
 		/// <exception cref="System.ArgumentNullException">
 		/// <para><paramref name="options"/> is <c>null</c>.</para>
@@ -409,7 +411,7 @@ namespace MimeKit {
 		/// <exception cref="System.IO.IOException">
 		/// An I/O error occurred.
 		/// </exception>
-		public virtual void WriteTo (FormatOptions options, Stream stream, CancellationToken cancellationToken = default (CancellationToken))
+		public virtual void WriteTo (FormatOptions options, Stream stream, bool contentOnly, CancellationToken cancellationToken = default (CancellationToken))
 		{
 			if (options == null)
 				throw new ArgumentNullException ("options");
@@ -417,7 +419,57 @@ namespace MimeKit {
 			if (stream == null)
 				throw new ArgumentNullException ("stream");
 
-			Headers.WriteTo (options, stream, cancellationToken);
+			if (!contentOnly)
+				Headers.WriteTo (options, stream, cancellationToken);
+		}
+
+		/// <summary>
+		/// Writes the <see cref="MimeKit.MimeEntity"/> to the specified output stream.
+		/// </summary>
+		/// <remarks>
+		/// <para>Writes the headers to the output stream, followed by a blank line.</para>
+		/// <para>Subclasses should override this method to write the content of the entity.</para>
+		/// </remarks>
+		/// <param name="options">The formatting options.</param>
+		/// <param name="stream">The output stream.</param>
+		/// <param name="cancellationToken">A cancellation token.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <para><paramref name="options"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="stream"/> is <c>null</c>.</para>
+		/// </exception>
+		/// <exception cref="System.OperationCanceledException">
+		/// The operation was canceled via the cancellation token.
+		/// </exception>
+		/// <exception cref="System.IO.IOException">
+		/// An I/O error occurred.
+		/// </exception>
+		public void WriteTo (FormatOptions options, Stream stream, CancellationToken cancellationToken = default (CancellationToken))
+		{
+			WriteTo (options, stream, false, cancellationToken);
+		}
+
+		/// <summary>
+		/// Writes the <see cref="MimeKit.MimeEntity"/> to the specified output stream.
+		/// </summary>
+		/// <remarks>
+		/// Writes the entity to the output stream.
+		/// </remarks>
+		/// <param name="stream">The output stream.</param>
+		/// <param name="contentOnly"><c>true</c> if only the content should be written; otherwise, <c>false</c>.</param>
+		/// <param name="cancellationToken">A cancellation token.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="stream"/> is <c>null</c>.
+		/// </exception>
+		/// <exception cref="System.OperationCanceledException">
+		/// The operation was canceled via the cancellation token.
+		/// </exception>
+		/// <exception cref="System.IO.IOException">
+		/// An I/O error occurred.
+		/// </exception>
+		public void WriteTo (Stream stream, bool contentOnly, CancellationToken cancellationToken = default (CancellationToken))
+		{
+			WriteTo (FormatOptions.Default, stream, contentOnly, cancellationToken);
 		}
 
 		/// <summary>
@@ -439,10 +491,57 @@ namespace MimeKit {
 		/// </exception>
 		public void WriteTo (Stream stream, CancellationToken cancellationToken = default (CancellationToken))
 		{
-			WriteTo (FormatOptions.Default, stream, cancellationToken);
+			WriteTo (FormatOptions.Default, stream, false, cancellationToken);
 		}
 
-#if !PORTABLE && !COREFX
+#if !PORTABLE
+		/// <summary>
+		/// Writes the <see cref="MimeKit.MimeEntity"/> to the specified file.
+		/// </summary>
+		/// <remarks>
+		/// Writes the <see cref="MimeKit.MimeEntity"/> to the specified file using the provided formatting options.
+		/// </remarks>
+		/// <param name="options">The formatting options.</param>
+		/// <param name="fileName">The file.</param>
+		/// <param name="contentOnly"><c>true</c> if only the content should be written; otherwise, <c>false</c>.</param>
+		/// <param name="cancellationToken">A cancellation token.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <para><paramref name="options"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="fileName"/> is <c>null</c>.</para>
+		/// </exception>
+		/// <exception cref="System.ArgumentException">
+		/// <paramref name="fileName"/> is a zero-length string, contains only white space, or
+		/// contains one or more invalid characters as defined by
+		/// <see cref="System.IO.Path.InvalidPathChars"/>.
+		/// </exception>
+		/// <exception cref="System.OperationCanceledException">
+		/// The operation was canceled via the cancellation token.
+		/// </exception>
+		/// <exception cref="System.IO.DirectoryNotFoundException">
+		/// <paramref name="fileName"/> is an invalid file path.
+		/// </exception>
+		/// <exception cref="System.IO.FileNotFoundException">
+		/// The specified file path could not be found.
+		/// </exception>
+		/// <exception cref="System.UnauthorizedAccessException">
+		/// The user does not have access to write to the specified file.
+		/// </exception>
+		/// <exception cref="System.IO.IOException">
+		/// An I/O error occurred.
+		/// </exception>
+		public void WriteTo (FormatOptions options, string fileName, bool contentOnly, CancellationToken cancellationToken = default (CancellationToken))
+		{
+			if (options == null)
+				throw new ArgumentNullException ("options");
+
+			if (fileName == null)
+				throw new ArgumentNullException ("fileName");
+
+			using (var stream = File.Open (fileName, FileMode.Create, FileAccess.Write))
+				WriteTo (options, stream, contentOnly, cancellationToken);
+		}
+
 		/// <summary>
 		/// Writes the <see cref="MimeKit.MimeEntity"/> to the specified file.
 		/// </summary>
@@ -486,7 +585,48 @@ namespace MimeKit {
 				throw new ArgumentNullException ("fileName");
 
 			using (var stream = File.Open (fileName, FileMode.Create, FileAccess.Write))
-				WriteTo (options, stream, cancellationToken);
+				WriteTo (options, stream, false, cancellationToken);
+		}
+
+		/// <summary>
+		/// Writes the <see cref="MimeKit.MimeEntity"/> to the specified file.
+		/// </summary>
+		/// <remarks>
+		/// Writes the <see cref="MimeKit.MimeEntity"/> to the specified file using the default formatting options.
+		/// </remarks>
+		/// <param name="fileName">The file.</param>
+		/// <param name="contentOnly"><c>true</c> if only the content should be written; otherwise, <c>false</c>.</param>
+		/// <param name="cancellationToken">A cancellation token.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="fileName"/> is <c>null</c>.
+		/// </exception>
+		/// <exception cref="System.ArgumentException">
+		/// <paramref name="fileName"/> is a zero-length string, contains only white space, or
+		/// contains one or more invalid characters as defined by
+		/// <see cref="System.IO.Path.InvalidPathChars"/>.
+		/// </exception>
+		/// <exception cref="System.OperationCanceledException">
+		/// The operation was canceled via the cancellation token.
+		/// </exception>
+		/// <exception cref="System.IO.DirectoryNotFoundException">
+		/// <paramref name="fileName"/> is an invalid file path.
+		/// </exception>
+		/// <exception cref="System.IO.FileNotFoundException">
+		/// The specified file path could not be found.
+		/// </exception>
+		/// <exception cref="System.UnauthorizedAccessException">
+		/// The user does not have access to write to the specified file.
+		/// </exception>
+		/// <exception cref="System.IO.IOException">
+		/// An I/O error occurred.
+		/// </exception>
+		public void WriteTo (string fileName, bool contentOnly, CancellationToken cancellationToken = default (CancellationToken))
+		{
+			if (fileName == null)
+				throw new ArgumentNullException ("fileName");
+
+			using (var stream = File.Open (fileName, FileMode.Create, FileAccess.Write))
+				WriteTo (FormatOptions.Default, stream, contentOnly, cancellationToken);
 		}
 
 		/// <summary>
@@ -526,7 +666,7 @@ namespace MimeKit {
 				throw new ArgumentNullException ("fileName");
 
 			using (var stream = File.Open (fileName, FileMode.Create, FileAccess.Write))
-				WriteTo (FormatOptions.Default, stream, cancellationToken);
+				WriteTo (FormatOptions.Default, stream, false, cancellationToken);
 		}
 #endif
 
@@ -631,6 +771,8 @@ namespace MimeKit {
 		/// <param name="header">The header being added, changed or removed.</param>
 		protected virtual void OnHeadersChanged (HeaderListChangedAction action, Header header)
 		{
+			MailboxAddress mailbox;
+			int index = 0;
 			string text;
 
 			switch (action) {
@@ -663,7 +805,10 @@ namespace MimeKit {
 						baseUri = null;
 					break;
 				case HeaderId.ContentId:
-					contentId = MimeUtils.EnumerateReferences (header.RawValue, 0, header.RawValue.Length).FirstOrDefault ();
+					if (MailboxAddress.TryParse (Headers.Options, header.RawValue, ref index, header.RawValue.Length, false, out mailbox))
+						contentId = mailbox.Address;
+					else
+						contentId = null;
 					break;
 				}
 				break;
@@ -839,7 +984,7 @@ namespace MimeKit {
 			return Load (ParserOptions.Default, stream, false, cancellationToken);
 		}
 
-#if !PORTABLE && !COREFX
+#if !PORTABLE
 		/// <summary>
 		/// Load a <see cref="MimeEntity"/> from the specified file.
 		/// </summary>

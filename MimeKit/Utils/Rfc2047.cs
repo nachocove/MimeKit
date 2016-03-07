@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc.
+// Copyright (c) 2013-2016 Xamarin Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -653,6 +653,44 @@ namespace MimeKit.Utils {
 			return DecodePhrase (phrase, 0, phrase.Length);
 		}
 
+		internal static string DecodeText (ParserOptions options, byte[] text, int startIndex, int count, out int codepage)
+		{
+			codepage = Encoding.UTF8.CodePage;
+
+			if (count == 0)
+				return string.Empty;
+
+			unsafe {
+				fixed (byte* inbuf = text) {
+					var tokens = TokenizeText (options, inbuf, startIndex, count);
+
+					// collect the charsets used to encode each encoded-word token
+					// (and the number of tokens each charset was used in)
+					var codepages = new Dictionary<int, int> ();
+					foreach (var token in tokens) {
+						if (token.CodePage == 0)
+							continue;
+
+						if (!codepages.ContainsKey (token.CodePage))
+							codepages.Add (token.CodePage, 1);
+						else
+							codepages[token.CodePage]++;
+					}
+
+					int max = 0;
+					foreach (var kvp in codepages) {
+						if (kvp.Value <= max)
+							continue;
+
+						max = Math.Max (kvp.Value, max);
+						codepage = kvp.Key;
+					}
+
+					return DecodeTokens (options, tokens, text, inbuf, count);
+				}
+			}
+		}
+
 		/// <summary>
 		/// Decodes unstructured text.
 		/// </summary>
@@ -924,8 +962,9 @@ namespace MimeKit.Utils {
 			return encoding.CodePage == 50220 || encoding.CodePage == 50222;
 		}
 
-		static void AppendEncodedWord (StringBuilder str, Encoding charset, string text, int startIndex, int length, QEncodeMode mode)
+		internal static int AppendEncodedWord (StringBuilder str, Encoding charset, string text, int startIndex, int length, QEncodeMode mode)
 		{
+			int startLength = str.Length;
 			var chars = new char[length];
 			IMimeEncoder encoder;
 			byte[] word, encoded;
@@ -956,6 +995,8 @@ namespace MimeKit.Utils {
 			for (int i = 0; i < len; i++)
 				str.Append ((char) encoded[i]);
 			str.Append ("?=");
+
+			return str.Length - startLength;
 		}
 
 		static void AppendQuoted (StringBuilder str, string text, int startIndex, int length)

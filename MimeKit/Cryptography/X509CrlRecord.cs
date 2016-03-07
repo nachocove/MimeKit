@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -159,10 +159,10 @@ namespace MimeKit.Cryptography {
 				throw new ArgumentNullException ("crl");
 
 			if (crl.NextUpdate != null)
-				NextUpdate = crl.NextUpdate.Value;
+				NextUpdate = crl.NextUpdate.Value.ToUniversalTime ();
 
 			IssuerName = crl.IssuerDN.ToString ();
-			ThisUpdate = crl.ThisUpdate;
+			ThisUpdate = crl.ThisUpdate.ToUniversalTime ();
 			IsDelta = crl.IsDelta ();
 			Crl = crl;
 		}

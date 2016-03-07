@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -33,9 +33,9 @@ namespace MimeKit.Cryptography {
 	/// <remarks>
 	/// <para>The X.509 Key Usage Flags can be used to determine what operations
 	/// a certificate can be used for.</para>
-	/// <para>Note: a value of <see cref="X509KeyUsageFlags.None"/> indicates that
+	/// <para><alert class="tip">A value of <see cref="X509KeyUsageFlags.None"/> indicates that
 	/// there are no restrictions on the use of the
-	/// <see cref="Org.BouncyCastle.X509.X509Certificate"/>.</para>
+	/// <see cref="Org.BouncyCastle.X509.X509Certificate"/>.</alert></para>
 	/// </remarks>
 	[Flags]
 	public enum X509KeyUsageFlags {

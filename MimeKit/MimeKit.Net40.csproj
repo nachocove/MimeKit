@@ -71,6 +71,7 @@
     <Compile Include="Cryptography\DigestAlgorithm.cs" />
     <Compile Include="Cryptography\DigitalSignatureCollection.cs" />
     <Compile Include="Cryptography\DigitalSignatureVerifyException.cs" />
+    <Compile Include="Cryptography\DkimBodyFilter.cs" />
     <Compile Include="Cryptography\DkimCanonicalizationAlgorithm.cs" />
     <Compile Include="Cryptography\DkimHashStream.cs" />
     <Compile Include="Cryptography\DkimRelaxedBodyFilter.cs" />
@@ -196,6 +197,7 @@
     <Compile Include="Utils\Crc32.cs" />
     <Compile Include="Utils\DateUtils.cs" />
     <Compile Include="Utils\MimeUtils.cs" />
+    <Compile Include="Utils\OptimizedOrdinalComparer.cs" />
     <Compile Include="Utils\PackedByteArray.cs" />
     <Compile Include="Utils\ParseUtils.cs" />
     <Compile Include="Utils\Rfc2047.cs" />
@@ -238,7 +240,9 @@
     <Compile Include="Multipart.cs" />
     <Compile Include="MultipartAlternative.cs" />
     <Compile Include="MultipartRelated.cs" />
+    <Compile Include="MultipartReport.cs" />
     <Compile Include="Parameter.cs" />
+    <Compile Include="ParameterEncodingMethod.cs" />
     <Compile Include="ParameterList.cs" />
     <Compile Include="ParseException.cs" />
     <Compile Include="ParserOptions.cs" />

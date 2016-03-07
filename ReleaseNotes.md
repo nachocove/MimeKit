@@ -1,5 +1,114 @@
 # Release Notes
 
+### MimeKit 1.3.0
+
+* Added support for dnxcore50
+
+### MimeKit 1.2.22
+
+* Added a new SecureMimeContext.Verify() overload that returns the extracted content stream.
+* Exposed the SecureMimeContext.GetDigitalSignatures() method as protected, allowing custom
+  subclasses to implement their own Verify() methods.
+* Fixed X509CertificateDatabase to store the X509Certificate NotBefore and NotAfter DateTimes
+  in UTC rather than LocalTime.
+* Added a work-around for GoDaddy's ASP.NET web host which does not support the iso-8859-1
+  System.Text.Encoding (used as a fallback encoding within MimeKit) by falling back to
+  Windows-1252 instead.
+* Added new convenience .ctors for CmsSigner and CmsRecipient for loading certificates from a
+  file or stream.
+* Fixed UrlScanner to properly deal with IPv6 literals in email addresses.
+
+### MimeKit 1.2.21
+
+* Added a MultipartReport class for multipart/report.
+* Fixed serialization for embedded message/* parts. (issue #228)
+* Fixed MimeMessage.WriteTo() to only make sure that the stream ends with a newline if it
+  wasn't parsed. (issue #227)
+* Fixed MimeMessage to only set a MIME-Version if the message was not produced by the parser.
+* Ignore timezones outside the range of -1200 to +1400.
+* Added InternetAddress.Clone() to allow addresses to be cloned.
+* Properly serialize message/rfc822 parts that contain an mbox marker.
+* Fixed MimeMessage.DkimSign() to not enforce 7bit encoding of the body. (issue #224)
+* Fixed ParameterList.IndexOf(string) to be case insensitive.
+
+### MimeKit 1.2.20
+
+* Fixed serialization of mime parts with empty content. (issue #221)
+* Fixed a bug in the TnefPropertyReader that would break when not all properties were read
+  by the consumer of the API.
+* Fixed the InternetAddress parser to throw a more informative error when parsing broken
+  routes in mailboxes.
+* Added HeaderList.Add(*, Encoding, string) and .Insert(*, Encoding, string) methods.
+* Added more OpenPgpContext.Encrypt() overloads (and equivalent MultipartEncrypted overloads).
+* Added OpenPgpContext.Import(PgpSecretKeyRing) and OpenPgpContext.Import(PgpSecretKeyRingBundle).
+* Fixed HtmlUtils.HtmlAttributeEncode() to properly encode non-ascii characters as entities.
+* Fixed HtmlUtils.HtmlEncode() to properly encode non-ascii characters as entities.
+* Fixed MimeParser to track whether or not each multipart had an end boundary so that
+  when they get reserialized, they match the original. (issue #218)
+* Implemented an optimized OrdinalIgnoreCase string comparer which improves the performance
+  of the MimeParser slightly.
+* Fixed QuotedPrintableDecoder to properly handle "==" sequences.
+* Added a ContentDisposition.TryParse(ParserOptions,string) method.
+* Added a ContentType.TryParse(ParserOptions,string) method.
+* Fixed MimeParser to trim the CR from the mbox From marker.
+* Fixed SqlCertificateDatabase to properly chain Dispose.
+
+### MimeKit 1.2.19
+
+* Handle illegal Content-Id headers that do not enclose their values in <>'s. (issue #215)
+* Fixed reserialization of MimeParts with empty content. (issue #213)
+* Improved parsing logic for malformed Content-Type headers.
+* Fixed HtmlTokenizer to work properly when some closing tags were not lowercase.
+* Bumped Bouncy Castle to v1.8.1.
+
+### MimeKit 1.2.18
+
+* Removed unimplemented TNEF APIs.
+* Use DateTime.UtcNow for S/MIME certificate validity checks.
+* Added ToString() methods on ContentType/Disposition that take FormatOptions.
+* Added a new ToString() method to InternetAddress that takes a FormatOptions. (issue #208)
+* Added a MimeEntity.WriteTo() method that takes a bool contentOnly parameter. (issue #207)
+* Added support for encoding parameter values using rfc2047 encoded-words instead of
+  the standard rfc2231 encoding.
+* Fixed SecureMailboxAddress's Fingerprint property to work with both the PGP key ID
+  *and* the fingerprint. Previously only worked with the PGP key id. (issue #203)
+* Added GroupAddress.Parse() and MailboxAddress.Parse() methods. (issue #197)
+* Set a default filename when generating application/pgp-signature parts. (issue #195)
+
+### MimeKit 1.2.17
+
+* Fixed DkimRelaxedBodyFilter to properly handle CRLF split across buffers.
+* Added ContentType.IsMimeType method to replace CongtentType.Matches.
+* Added S/MIME, PGP and DKIM support to the PCL and WindowsUniversal versions of MimeKit.
+* Fixed PGP key expiration calculation when encrypting. (issue #194)
+
+### MimeKit 1.2.16
+
+* Fixed relaxed body canonicalization logic for DKIM signatures. (issue #190)
+
+### MimeKit 1.2.15
+
+* Fixed the Date parser to catch exceptions thrown by the DateTimeOffset .ctor if any of the
+  fields are out of range.
+* Fixed logic for trimming trailing blank lines for the DKIM relaxed body algorithm. (issue #187)
+* Fixed DKIM body filters to reserve extra space in the output buffer. (issue #188)
+* Allow specifying a charset encoding for each Content-Type/Disposition parameter.
+
+### MimeKit 1.2.14
+
+* Fixed DKIM-Signature signing logic to use a UTC-based timestamp value rather than a
+  timestamp based on the local-time. (issue #180)
+* Fixed Multipart epilogue parsing and serialization logic to make sure that serializing
+  a multipart is properly byte-for-byte identical to the original text. This fixes a
+  corner-case that affected all types of digital signatures (DKIM, PGP, and S/MIME)
+  spanning across nested multiparts. (issue #181)
+* Fixed MimeMessage.WriteTo() to ensure that the output stream always ends with a new-line.
+
+### MimeKit 1.2.13
+
+* Modified Base64Encoder's .ctor to allow specifying a maxLineLength.
+* Fixed DKIM signing logic for multipart/alternative messages. (issue #178)
+
 ### MimeKit 1.2.12
 
 * Prevent infinite loop when flushing CharsetFilter when there is no input data left.

@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -47,6 +47,8 @@ namespace UnitTests {
 			for (int i = 0; i < text.Length; i++) {
 				if (text[i] == '\\' || text[i] == '"')
 					quoted.Append ('\\');
+				else if (text[i] == '\r')
+					continue;
 				quoted.Append (text[i]);
 			}
 			quoted.Append ("\"");
@@ -56,17 +58,22 @@ namespace UnitTests {
 
 		static void VerifyHtmlTokenizerOutput (string path)
 		{
+			var outpath = Path.ChangeExtension (path, ".out.html");
 			var tokens = Path.ChangeExtension (path, ".tokens");
-			var expected = File.Exists (tokens) ? File.ReadAllText (tokens).Replace ("\r", "") : string.Empty;
+			var expectedOutput = File.Exists (outpath) ? File.ReadAllText (outpath) : string.Empty;
+			var expected = File.Exists (tokens) ? File.ReadAllText (tokens).Replace ("\r\n", "\n") : string.Empty;
+			var output = new StringBuilder ();
 			var actual = new StringBuilder ();
 
-			using (var textReader = File.OpenText (path)) {
+			using (var textReader = new StreamReader (path, Encoding.GetEncoding (1252))) {
 				var tokenizer = new HtmlTokenizer (textReader);
 				HtmlToken token;
 
 				Assert.AreEqual (HtmlTokenizerState.Data, tokenizer.TokenizerState);
 
 				while (tokenizer.ReadNextToken (out token)) {
+					output.Append (token);
+
 					actual.AppendFormat ("{0}: ", token.Kind);
 
 					switch (token.Kind) {
@@ -104,7 +111,7 @@ namespace UnitTests {
 						break;
 					case HtmlTokenKind.Comment:
 						var comment = (HtmlCommentToken) token;
-						actual.Append (comment.Comment);
+						actual.Append (comment.Comment.Replace ("\r\n", "\n"));
 						actual.Append ('\n');
 						break;
 					case HtmlTokenKind.DocType:
@@ -141,7 +148,11 @@ namespace UnitTests {
 			if (!File.Exists (tokens))
 				File.WriteAllText (tokens, actual.ToString ());
 
+			if (!File.Exists (outpath))
+				File.WriteAllText (outpath, output.ToString ());
+
 			Assert.AreEqual (expected, actual.ToString (), "The token stream does not match the expected tokens.");
+			Assert.AreEqual (expectedOutput, output.ToString (), "The output stream does not match the expected output.");
 		}
 
 		[Test]
@@ -184,6 +195,12 @@ namespace UnitTests {
 		public void TestTokenizer ()
 		{
 			VerifyHtmlTokenizerOutput (Path.Combine ("..", "..", "TestData", "html", "test.html"));
+		}
+
+		[Test]
+		public void TestPlainText ()
+		{
+			VerifyHtmlTokenizerOutput (Path.Combine ("..", "..", "TestData", "html", "plaintext.html"));
 		}
 
 		[Test]

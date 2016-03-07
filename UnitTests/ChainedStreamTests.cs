@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2014 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -118,9 +118,24 @@ namespace UnitTests {
 
 			for (int attempt = 0; attempt < 10; attempt++) {
 				long offset = random.Next () % master.Length;
+				var origin = (SeekOrigin) (attempt % 3);
+				long expected, actual;
 
-				long expected = master.Seek (offset, SeekOrigin.Begin);
-				long actual = chained.Seek (offset, SeekOrigin.Begin);
+				switch (origin) {
+				case SeekOrigin.Current: offset = offset - master.Position; break;
+				case SeekOrigin.End: offset = offset - master.Length; break;
+				}
+
+				if (origin == SeekOrigin.Begin) {
+					chained.Position = offset;
+					master.Position = offset;
+
+					expected = master.Position;
+					actual = chained.Position;
+				} else {
+					expected = master.Seek (offset, origin);
+					actual = chained.Seek (offset, origin);
+				}
 
 				Assert.AreEqual (expected, actual, "Seeking the chained stream did not return the expected position");
 
@@ -180,6 +195,12 @@ namespace UnitTests {
 			var entity = MimeEntity.Load (chained, true) as TextPart;
 
 			Assert.AreEqual ("Hello, world!\r\n", entity.Text);
+		}
+
+		[Test]
+		public void TestSetLengthThrowsNotSupported ()
+		{
+			Assert.Throws<NotSupportedException> (() => chained.SetLength (500));
 		}
 	}
 

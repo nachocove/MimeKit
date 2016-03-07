@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -25,8 +25,9 @@
 //
 
 using System;
+using System.IO;
 
-#if !PORTABLE
+#if !PORTABLE && !COREFX
 using X509Certificate2 = System.Security.Cryptography.X509Certificates.X509Certificate2;
 #endif
 
@@ -58,15 +59,15 @@ namespace MimeKit.Cryptography {
 		/// <exception cref="System.ArgumentNullException">
 		/// <paramref name="certificate"/> is <c>null</c>.
 		/// </exception>
-		public CmsRecipient (X509Certificate certificate, SubjectIdentifierType recipientIdentifierType)
+		public CmsRecipient (X509Certificate certificate, SubjectIdentifierType recipientIdentifierType = SubjectIdentifierType.IssuerAndSerialNumber)
 		{
 			if (certificate == null)
 				throw new ArgumentNullException ("certificate");
 
-			if (recipientIdentifierType == SubjectIdentifierType.Unknown)
+			if (recipientIdentifierType == SubjectIdentifierType.IssuerAndSerialNumber)
 				RecipientIdentifierType = SubjectIdentifierType.IssuerAndSerialNumber;
 			else
-				RecipientIdentifierType = recipientIdentifierType;
+				RecipientIdentifierType = SubjectIdentifierType.SubjectKeyIdentifier;
 
 			EncryptionAlgorithms = new EncryptionAlgorithm[] { EncryptionAlgorithm.TripleDes };
 			Certificate = certificate;
@@ -76,27 +77,89 @@ namespace MimeKit.Cryptography {
 		/// Initializes a new instance of the <see cref="MimeKit.Cryptography.CmsRecipient"/> class.
 		/// </summary>
 		/// <remarks>
+		/// <para>Creates a new <see cref="CmsRecipient"/>, loading the certificate from the specified stream.</para>
 		/// <para>The initial value of the <see cref="EncryptionAlgorithms"/> property will be set to
 		/// the Triple-DES encryption algorithm, which should be safe to assume for all modern
 		/// S/MIME v3.x client implementations.</para>
-		/// <para>The <see cref="RecipientIdentifierType"/> will be initialized to
-		/// <see cref="SubjectIdentifierType.IssuerAndSerialNumber"/>.</para>
 		/// </remarks>
-		/// <param name="certificate">The recipient's certificate.</param>
+		/// <param name="stream">The stream containing the recipient's certificate.</param>
+		/// <param name="recipientIdentifierType">The recipient identifier type.</param>
 		/// <exception cref="System.ArgumentNullException">
-		/// <paramref name="certificate"/> is <c>null</c>.
+		/// <paramref name="stream"/> is <c>null</c>.
 		/// </exception>
-		public CmsRecipient (X509Certificate certificate)
+		/// <exception cref="System.IO.IOException">
+		/// An I/O error occurred.
+		/// </exception>
+		public CmsRecipient (Stream stream, SubjectIdentifierType recipientIdentifierType = SubjectIdentifierType.IssuerAndSerialNumber)
 		{
-			if (certificate == null)
-				throw new ArgumentNullException ("certificate");
+			if (stream == null)
+				throw new ArgumentNullException ("stream");
+
+			if (recipientIdentifierType == SubjectIdentifierType.IssuerAndSerialNumber)
+				RecipientIdentifierType = SubjectIdentifierType.IssuerAndSerialNumber;
+			else
+				RecipientIdentifierType = SubjectIdentifierType.SubjectKeyIdentifier;
+
+			var parser = new X509CertificateParser ();
 
 			EncryptionAlgorithms = new EncryptionAlgorithm[] { EncryptionAlgorithm.TripleDes };
 			RecipientIdentifierType = SubjectIdentifierType.IssuerAndSerialNumber;
-			Certificate = certificate;
+			Certificate = parser.ReadCertificate (stream);
 		}
 
 #if !PORTABLE
+		/// <summary>
+		/// Initializes a new instance of the <see cref="MimeKit.Cryptography.CmsRecipient"/> class.
+		/// </summary>
+		/// <remarks>
+		/// <para>Creates a new <see cref="CmsRecipient"/>, loading the certificate from the specified file.</para>
+		/// <para>The initial value of the <see cref="EncryptionAlgorithms"/> property will be set to
+		/// the Triple-DES encryption algorithm, which should be safe to assume for all modern
+		/// S/MIME v3.x client implementations.</para>
+		/// </remarks>
+		/// <param name="fileName">The file containing the recipient's certificate.</param>
+		/// <param name="recipientIdentifierType">The recipient identifier type.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="fileName"/> is <c>null</c>.
+		/// </exception>
+		/// <exception cref="System.ArgumentException">
+		/// <paramref name="fileName"/> is a zero-length string, contains only white space, or
+		/// contains one or more invalid characters as defined by
+		/// <see cref="System.IO.Path.InvalidPathChars"/>.
+		/// </exception>
+		/// <exception cref="System.IO.DirectoryNotFoundException">
+		/// <paramref name="fileName"/> is an invalid file path.
+		/// </exception>
+		/// <exception cref="System.IO.FileNotFoundException">
+		/// The specified file path could not be found.
+		/// </exception>
+		/// <exception cref="System.UnauthorizedAccessException">
+		/// The user does not have access to read the specified file.
+		/// </exception>
+		/// <exception cref="System.IO.IOException">
+		/// An I/O error occurred.
+		/// </exception>
+		public CmsRecipient (string fileName, SubjectIdentifierType recipientIdentifierType = SubjectIdentifierType.IssuerAndSerialNumber)
+		{
+			if (fileName == null)
+				throw new ArgumentNullException ("fileName");
+
+			var parser = new X509CertificateParser ();
+
+			if (recipientIdentifierType == SubjectIdentifierType.IssuerAndSerialNumber)
+				RecipientIdentifierType = SubjectIdentifierType.IssuerAndSerialNumber;
+			else
+				RecipientIdentifierType = SubjectIdentifierType.SubjectKeyIdentifier;
+
+			EncryptionAlgorithms = new EncryptionAlgorithm[] { EncryptionAlgorithm.TripleDes };
+			RecipientIdentifierType = SubjectIdentifierType.IssuerAndSerialNumber;
+
+			using (var stream = File.OpenRead (fileName))
+				Certificate = parser.ReadCertificate (stream);
+		}
+#endif
+
+#if !PORTABLE && !COREFX
 		/// <summary>
 		/// Initializes a new instance of the <see cref="MimeKit.Cryptography.CmsRecipient"/> class.
 		/// </summary>
@@ -110,41 +173,17 @@ namespace MimeKit.Cryptography {
 		/// <exception cref="System.ArgumentNullException">
 		/// <paramref name="certificate"/> is <c>null</c>.
 		/// </exception>
-		public CmsRecipient (X509Certificate2 certificate, SubjectIdentifierType recipientIdentifierType)
+		public CmsRecipient (X509Certificate2 certificate, SubjectIdentifierType recipientIdentifierType = SubjectIdentifierType.IssuerAndSerialNumber)
 		{
 			if (certificate == null)
 				throw new ArgumentNullException ("certificate");
 
-			if (recipientIdentifierType == SubjectIdentifierType.Unknown)
+			if (recipientIdentifierType == SubjectIdentifierType.IssuerAndSerialNumber)
 				RecipientIdentifierType = SubjectIdentifierType.IssuerAndSerialNumber;
 			else
-				RecipientIdentifierType = recipientIdentifierType;
+				RecipientIdentifierType = SubjectIdentifierType.SubjectKeyIdentifier;
 
 			EncryptionAlgorithms = new EncryptionAlgorithm[] { EncryptionAlgorithm.TripleDes };
-			Certificate = DotNetUtilities.FromX509Certificate (certificate);
-		}
-
-		/// <summary>
-		/// Initializes a new instance of the <see cref="MimeKit.Cryptography.CmsRecipient"/> class.
-		/// </summary>
-		/// <remarks>
-		/// <para>The initial value of the <see cref="EncryptionAlgorithms"/> property will be set to
-		/// the Triple-DES encryption algorithm, which should be safe to assume for all modern
-		/// S/MIME v3.x client implementations.</para>
-		/// <para>The <see cref="RecipientIdentifierType"/> will be initialized to
-		/// <see cref="SubjectIdentifierType.IssuerAndSerialNumber"/>.</para>
-		/// </remarks>
-		/// <param name="certificate">The recipient's certificate.</param>
-		/// <exception cref="System.ArgumentNullException">
-		/// <paramref name="certificate"/> is <c>null</c>.
-		/// </exception>
-		public CmsRecipient (X509Certificate2 certificate)
-		{
-			if (certificate == null)
-				throw new ArgumentNullException ("certificate");
-
-			EncryptionAlgorithms = new EncryptionAlgorithm[] { EncryptionAlgorithm.TripleDes };
-			RecipientIdentifierType = SubjectIdentifierType.IssuerAndSerialNumber;
 			Certificate = DotNetUtilities.FromX509Certificate (certificate);
 		}
 #endif

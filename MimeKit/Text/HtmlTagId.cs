@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -28,6 +28,8 @@ using System;
 using System.Linq;
 using System.Reflection;
 using System.Collections.Generic;
+
+using MimeKit.Utils;
 
 namespace MimeKit.Text {
 	/// <summary>
@@ -740,7 +742,7 @@ namespace MimeKit.Text {
 		{
 			var values = (HtmlTagId[]) Enum.GetValues (typeof (HtmlTagId));
 
-			TagNameToId = new Dictionary<string, HtmlTagId> (values.Length - 1, StringComparer.OrdinalIgnoreCase);
+			TagNameToId = new Dictionary<string, HtmlTagId> (values.Length - 1, MimeUtils.OrdinalIgnoreCase);
 
 			for (int i = 0; i < values.Length - 1; i++)
 				TagNameToId.Add (values[i].ToHtmlTagName (), values[i]);

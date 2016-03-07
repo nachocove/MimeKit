@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -135,6 +135,18 @@ namespace MimeKit {
 		}
 
 		/// <summary>
+		/// Clone the mailbox address.
+		/// </summary>
+		/// <remarks>
+		/// Clones the mailbox address.
+		/// </remarks>
+		/// <returns>The cloned mailbox address.</returns>
+		public override InternetAddress Clone ()
+		{
+			return new MailboxAddress (Encoding, Name, Route, Address);
+		}
+
+		/// <summary>
 		/// Gets the mailbox route.
 		/// </summary>
 		/// <remarks>
@@ -176,9 +188,10 @@ namespace MimeKit {
 		/// <remarks>
 		/// <para>International addresses are addresses that contain international
 		/// characters in either their local-parts or their domains.</para>
-		/// <para>For more information, see http://tools.ietf.org/html/rfc6532#section-3.2</para>
+		/// <para>For more information, see section 3.2 of
+		/// <a href="https://tools.ietf.org/html/rfc6532#section-3.2">rfc6532</a>.</para>
 		/// </remarks>
-		/// <value><c>true</c> if th address is an international address; otherwise, <c>false</c>.</value>
+		/// <value><c>true</c> if the address is an international address; otherwise, <c>false</c>.</value>
 		public bool IsInternational {
 			get {
 				if (address == null)
@@ -296,14 +309,21 @@ namespace MimeKit {
 		/// for display purposes.
 		/// </remarks>
 		/// <returns>A string representing the <see cref="MailboxAddress"/>.</returns>
+		/// <param name="options">The formatting options.</param>
 		/// <param name="encode">If set to <c>true</c>, the <see cref="MailboxAddress"/> will be encoded.</param>
-		public override string ToString (bool encode)
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="options"/> is <c>null</c>.
+		/// </exception>
+		public override string ToString (FormatOptions options, bool encode)
 		{
+			if (options == null)
+				throw new ArgumentNullException ("options");
+
 			if (encode) {
 				var builder = new StringBuilder ();
 				int lineLength = 0;
 
-				Encode (FormatOptions.Default, builder, ref lineLength);
+				Encode (options, builder, ref lineLength);
 
 				return builder.ToString ();
 			}
@@ -349,11 +369,29 @@ namespace MimeKit {
 			OnChanged ();
 		}
 
+		internal static bool TryParse (ParserOptions options, byte[] text, ref int index, int endIndex, bool throwOnError, out MailboxAddress mailbox)
+		{
+			var flags = AddressParserFlags.AllowMailboxAddress;
+			InternetAddress address;
+
+			if (throwOnError)
+				flags |= AddressParserFlags.ThrowOnError;
+
+			if (!InternetAddress.TryParse (options, text, ref index, endIndex, flags, out address)) {
+				mailbox = null;
+				return false;
+			}
+
+			mailbox = (MailboxAddress) address;
+
+			return true;
+		}
+
 		/// <summary>
 		/// Tries to parse the given input buffer into a new <see cref="MimeKit.MailboxAddress"/> instance.
 		/// </summary>
 		/// <remarks>
-		/// Parses a single <see cref="MailboxAddress"/>. If the the address is not a mailbox address or
+		/// Parses a single <see cref="MailboxAddress"/>. If the address is not a mailbox address or
 		/// there is more than a single mailbox address, then parsing will fail.
 		/// </remarks>
 		/// <returns><c>true</c>, if the address was successfully parsed, <c>false</c> otherwise.</returns>
@@ -373,23 +411,27 @@ namespace MimeKit {
 		/// </exception>
 		public static bool TryParse (ParserOptions options, byte[] buffer, int startIndex, int length, out MailboxAddress mailbox)
 		{
-			InternetAddress address;
+			ParseUtils.ValidateArguments (options, buffer, startIndex, length);
 
-			if (!InternetAddress.TryParse (options, buffer, startIndex, length, out address)) {
+			int endIndex = startIndex + length;
+			int index = startIndex;
+
+			if (!TryParse (options, buffer, ref index, endIndex, false, out mailbox))
+				return false;
+
+			if (!ParseUtils.SkipCommentsAndWhiteSpace (buffer, ref index, endIndex, false) || index != endIndex) {
 				mailbox = null;
 				return false;
 			}
 
-			mailbox = address as MailboxAddress;
-
-			return mailbox != null;
+			return true;
 		}
 
 		/// <summary>
 		/// Tries to parse the given input buffer into a new <see cref="MimeKit.MailboxAddress"/> instance.
 		/// </summary>
 		/// <remarks>
-		/// Parses a single <see cref="MailboxAddress"/>. If the the address is not a mailbox address or
+		/// Parses a single <see cref="MailboxAddress"/>. If the address is not a mailbox address or
 		/// there is more than a single mailbox address, then parsing will fail.
 		/// </remarks>
 		/// <returns><c>true</c>, if the address was successfully parsed, <c>false</c> otherwise.</returns>
@@ -413,7 +455,7 @@ namespace MimeKit {
 		/// Tries to parse the given input buffer into a new <see cref="MimeKit.MailboxAddress"/> instance.
 		/// </summary>
 		/// <remarks>
-		/// Parses a single <see cref="MailboxAddress"/>. If the the address is not a mailbox address or
+		/// Parses a single <see cref="MailboxAddress"/>. If the address is not a mailbox address or
 		/// there is more than a single mailbox address, then parsing will fail.
 		/// </remarks>
 		/// <returns><c>true</c>, if the address was successfully parsed, <c>false</c> otherwise.</returns>
@@ -431,23 +473,27 @@ namespace MimeKit {
 		/// </exception>
 		public static bool TryParse (ParserOptions options, byte[] buffer, int startIndex, out MailboxAddress mailbox)
 		{
-			InternetAddress address;
+			ParseUtils.ValidateArguments (options, buffer, startIndex);
 
-			if (!InternetAddress.TryParse (options, buffer, startIndex, out address)) {
+			int endIndex = buffer.Length;
+			int index = startIndex;
+
+			if (!TryParse (options, buffer, ref index, endIndex, false, out mailbox))
+				return false;
+
+			if (!ParseUtils.SkipCommentsAndWhiteSpace (buffer, ref index, endIndex, false) || index != endIndex) {
 				mailbox = null;
 				return false;
 			}
 
-			mailbox = address as MailboxAddress;
-
-			return mailbox != null;
+			return true;
 		}
 
 		/// <summary>
 		/// Tries to parse the given input buffer into a new <see cref="MimeKit.MailboxAddress"/> instance.
 		/// </summary>
 		/// <remarks>
-		/// Parses a single <see cref="MailboxAddress"/>. If the the address is not a mailbox address or
+		/// Parses a single <see cref="MailboxAddress"/>. If the address is not a mailbox address or
 		/// there is more than a single mailbox address, then parsing will fail.
 		/// </remarks>
 		/// <returns><c>true</c>, if the address was successfully parsed, <c>false</c> otherwise.</returns>
@@ -469,7 +515,7 @@ namespace MimeKit {
 		/// Tries to parse the given input buffer into a new <see cref="MimeKit.MailboxAddress"/> instance.
 		/// </summary>
 		/// <remarks>
-		/// Parses a single <see cref="MailboxAddress"/>. If the the address is not a mailbox address or
+		/// Parses a single <see cref="MailboxAddress"/>. If the address is not a mailbox address or
 		/// there is more than a single mailbox address, then parsing will fail.
 		/// </remarks>
 		/// <returns><c>true</c>, if the address was successfully parsed, <c>false</c> otherwise.</returns>
@@ -483,23 +529,27 @@ namespace MimeKit {
 		/// </exception>
 		public static bool TryParse (ParserOptions options, byte[] buffer, out MailboxAddress mailbox)
 		{
-			InternetAddress address;
+			ParseUtils.ValidateArguments (options, buffer);
 
-			if (!InternetAddress.TryParse (options, buffer, out address)) {
+			int endIndex = buffer.Length;
+			int index = 0;
+
+			if (!TryParse (options, buffer, ref index, endIndex, false, out mailbox))
+				return false;
+
+			if (!ParseUtils.SkipCommentsAndWhiteSpace (buffer, ref index, endIndex, false) || index != endIndex) {
 				mailbox = null;
 				return false;
 			}
 
-			mailbox = address as MailboxAddress;
-
-			return mailbox != null;
+			return true;
 		}
 
 		/// <summary>
 		/// Tries to parse the given input buffer into a new <see cref="MimeKit.MailboxAddress"/> instance.
 		/// </summary>
 		/// <remarks>
-		/// Parses a single <see cref="MailboxAddress"/>. If the the address is not a mailbox address or
+		/// Parses a single <see cref="MailboxAddress"/>. If the address is not a mailbox address or
 		/// there is more than a single mailbox address, then parsing will fail.
 		/// </remarks>
 		/// <returns><c>true</c>, if the address was successfully parsed, <c>false</c> otherwise.</returns>
@@ -517,7 +567,7 @@ namespace MimeKit {
 		/// Tries to parse the given text into a new <see cref="MimeKit.MailboxAddress"/> instance.
 		/// </summary>
 		/// <remarks>
-		/// Parses a single <see cref="MailboxAddress"/>. If the the address is not a mailbox address or
+		/// Parses a single <see cref="MailboxAddress"/>. If the address is not a mailbox address or
 		/// there is more than a single mailbox address, then parsing will fail.
 		/// </remarks>
 		/// <returns><c>true</c>, if the address was successfully parsed, <c>false</c> otherwise.</returns>
@@ -529,23 +579,32 @@ namespace MimeKit {
 		/// </exception>
 		public static bool TryParse (ParserOptions options, string text, out MailboxAddress mailbox)
 		{
-			InternetAddress address;
+			if (options == null)
+				throw new ArgumentNullException ("options");
 
-			if (!InternetAddress.TryParse (options, text, out address)) {
+			if (text == null)
+				throw new ArgumentNullException ("text");
+
+			var buffer = Encoding.UTF8.GetBytes (text);
+			int endIndex = buffer.Length;
+			int index = 0;
+
+			if (!TryParse (options, buffer, ref index, endIndex, false, out mailbox))
+				return false;
+
+			if (!ParseUtils.SkipCommentsAndWhiteSpace (buffer, ref index, endIndex, false) || index != endIndex) {
 				mailbox = null;
 				return false;
 			}
 
-			mailbox = address as MailboxAddress;
-
-			return mailbox != null;
+			return true;
 		}
 
 		/// <summary>
 		/// Tries to parse the given text into a new <see cref="MimeKit.MailboxAddress"/> instance.
 		/// </summary>
 		/// <remarks>
-		/// Parses a single <see cref="MailboxAddress"/>. If the the address is not a mailbox address or
+		/// Parses a single <see cref="MailboxAddress"/>. If the address is not a mailbox address or
 		/// there is more than a single mailbox address, then parsing will fail.
 		/// </remarks>
 		/// <returns><c>true</c>, if the address was successfully parsed, <c>false</c> otherwise.</returns>
@@ -557,6 +616,259 @@ namespace MimeKit {
 		public static bool TryParse (string text, out MailboxAddress mailbox)
 		{
 			return TryParse (ParserOptions.Default, text, out mailbox);
+		}
+
+		/// <summary>
+		/// Parses the given input buffer into a new <see cref="MimeKit.MailboxAddress"/> instance.
+		/// </summary>
+		/// <remarks>
+		/// Parses a single <see cref="MailboxAddress"/>. If the address is not a mailbox address or
+		/// there is more than a single mailbox address, then parsing will fail.
+		/// </remarks>
+		/// <returns>The parsed <see cref="MimeKit.MailboxAddress"/>.</returns>
+		/// <param name="options">The parser options to use.</param>
+		/// <param name="buffer">The input buffer.</param>
+		/// <param name="startIndex">The starting index of the input buffer.</param>
+		/// <param name="length">The number of bytes in the input buffer to parse.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <para><paramref name="options"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="buffer"/> is <c>null</c>.</para>
+		/// </exception>
+		/// <exception cref="System.ArgumentOutOfRangeException">
+		/// <paramref name="startIndex"/> and <paramref name="length"/> do not specify
+		/// a valid range in the byte array.
+		/// </exception>
+		/// <exception cref="MimeKit.ParseException">
+		/// <paramref name="buffer"/> could not be parsed.
+		/// </exception>
+		public static new MailboxAddress Parse (ParserOptions options, byte[] buffer, int startIndex, int length)
+		{
+			ParseUtils.ValidateArguments (options, buffer, startIndex, length);
+
+			int endIndex = startIndex + length;
+			MailboxAddress mailbox;
+			int index = startIndex;
+
+			if (!TryParse (options, buffer, ref index, endIndex, true, out mailbox))
+				throw new ParseException ("No mailbox address found.", startIndex, startIndex);
+
+			ParseUtils.SkipCommentsAndWhiteSpace (buffer, ref index, endIndex, true);
+
+			if (index != endIndex)
+				throw new ParseException (string.Format ("Unexpected token at offset {0}", index), index, index);
+
+			return mailbox;
+		}
+
+		/// <summary>
+		/// Parses the given input buffer into a new <see cref="MimeKit.MailboxAddress"/> instance.
+		/// </summary>
+		/// <remarks>
+		/// Parses a single <see cref="MailboxAddress"/>. If the address is not a mailbox address or
+		/// there is more than a single mailbox address, then parsing will fail.
+		/// </remarks>
+		/// <returns>The parsed <see cref="MimeKit.MailboxAddress"/>.</returns>
+		/// <param name="buffer">The input buffer.</param>
+		/// <param name="startIndex">The starting index of the input buffer.</param>
+		/// <param name="length">The number of bytes in the input buffer to parse.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="buffer"/> is <c>null</c>.
+		/// </exception>
+		/// <exception cref="System.ArgumentOutOfRangeException">
+		/// <paramref name="startIndex"/> and <paramref name="length"/> do not specify
+		/// a valid range in the byte array.
+		/// </exception>
+		/// <exception cref="MimeKit.ParseException">
+		/// <paramref name="buffer"/> could not be parsed.
+		/// </exception>
+		public static new MailboxAddress Parse (byte[] buffer, int startIndex, int length)
+		{
+			return Parse (ParserOptions.Default, buffer, startIndex, length);
+		}
+
+		/// <summary>
+		/// Parses the given input buffer into a new <see cref="MimeKit.MailboxAddress"/> instance.
+		/// </summary>
+		/// <remarks>
+		/// Parses a single <see cref="MailboxAddress"/>. If the address is not a mailbox address or
+		/// there is more than a single mailbox address, then parsing will fail.
+		/// </remarks>
+		/// <returns>The parsed <see cref="MimeKit.MailboxAddress"/>.</returns>
+		/// <param name="options">The parser options to use.</param>
+		/// <param name="buffer">The input buffer.</param>
+		/// <param name="startIndex">The starting index of the input buffer.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <para><paramref name="options"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="buffer"/> is <c>null</c>.</para>
+		/// </exception>
+		/// <exception cref="System.ArgumentOutOfRangeException">
+		/// <paramref name="startIndex"/>is out of range.
+		/// </exception>
+		/// <exception cref="MimeKit.ParseException">
+		/// <paramref name="buffer"/> could not be parsed.
+		/// </exception>
+		public static new MailboxAddress Parse (ParserOptions options, byte[] buffer, int startIndex)
+		{
+			ParseUtils.ValidateArguments (options, buffer, startIndex);
+
+			int endIndex = buffer.Length;
+			MailboxAddress mailbox;
+			int index = startIndex;
+
+			if (!TryParse (options, buffer, ref index, endIndex, true, out mailbox))
+				throw new ParseException ("No mailbox address found.", startIndex, startIndex);
+
+			ParseUtils.SkipCommentsAndWhiteSpace (buffer, ref index, endIndex, true);
+
+			if (index != endIndex)
+				throw new ParseException (string.Format ("Unexpected token at offset {0}", index), index, index);
+
+			return mailbox;
+		}
+
+		/// <summary>
+		/// Parses the given input buffer into a new <see cref="MimeKit.MailboxAddress"/> instance.
+		/// </summary>
+		/// <remarks>
+		/// Parses a single <see cref="MailboxAddress"/>. If the address is not a mailbox address or
+		/// there is more than a single mailbox address, then parsing will fail.
+		/// </remarks>
+		/// <returns>The parsed <see cref="MimeKit.MailboxAddress"/>.</returns>
+		/// <param name="buffer">The input buffer.</param>
+		/// <param name="startIndex">The starting index of the input buffer.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="buffer"/> is <c>null</c>.
+		/// </exception>
+		/// <exception cref="System.ArgumentOutOfRangeException">
+		/// <paramref name="startIndex"/> is out of range.
+		/// </exception>
+		/// <exception cref="MimeKit.ParseException">
+		/// <paramref name="buffer"/> could not be parsed.
+		/// </exception>
+		public static new MailboxAddress Parse (byte[] buffer, int startIndex)
+		{
+			return Parse (ParserOptions.Default, buffer, startIndex);
+		}
+
+		/// <summary>
+		/// Parses the given input buffer into a new <see cref="MimeKit.MailboxAddress"/> instance.
+		/// </summary>
+		/// <remarks>
+		/// Parses a single <see cref="MailboxAddress"/>. If the address is not a mailbox address or
+		/// there is more than a single mailbox address, then parsing will fail.
+		/// </remarks>
+		/// <returns>The parsed <see cref="MimeKit.MailboxAddress"/>.</returns>
+		/// <param name="options">The parser options to use.</param>
+		/// <param name="buffer">The input buffer.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <para><paramref name="options"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="buffer"/> is <c>null</c>.</para>
+		/// </exception>
+		/// <exception cref="MimeKit.ParseException">
+		/// <paramref name="buffer"/> could not be parsed.
+		/// </exception>
+		public static new MailboxAddress Parse (ParserOptions options, byte[] buffer)
+		{
+			ParseUtils.ValidateArguments (options, buffer);
+
+			int endIndex = buffer.Length;
+			MailboxAddress mailbox;
+			int index = 0;
+
+			if (!TryParse (options, buffer, ref index, endIndex, true, out mailbox))
+				throw new ParseException ("No mailbox address found.", 0, 0);
+
+			ParseUtils.SkipCommentsAndWhiteSpace (buffer, ref index, endIndex, true);
+
+			if (index != endIndex)
+				throw new ParseException (string.Format ("Unexpected token at offset {0}", index), index, index);
+
+			return mailbox;
+		}
+
+		/// <summary>
+		/// Parses the given input buffer into a new <see cref="MimeKit.MailboxAddress"/> instance.
+		/// </summary>
+		/// <remarks>
+		/// Parses a single <see cref="MailboxAddress"/>. If the address is not a mailbox address or
+		/// there is more than a single mailbox address, then parsing will fail.
+		/// </remarks>
+		/// <returns>The parsed <see cref="MimeKit.MailboxAddress"/>.</returns>
+		/// <param name="buffer">The input buffer.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="buffer"/> is <c>null</c>.
+		/// </exception>
+		/// <exception cref="MimeKit.ParseException">
+		/// <paramref name="buffer"/> could not be parsed.
+		/// </exception>
+		public static new MailboxAddress Parse (byte[] buffer)
+		{
+			return Parse (ParserOptions.Default, buffer);
+		}
+
+		/// <summary>
+		/// Parses the given text into a new <see cref="MimeKit.MailboxAddress"/> instance.
+		/// </summary>
+		/// <remarks>
+		/// Parses a single <see cref="MailboxAddress"/>. If the address is not a mailbox address or
+		/// there is more than a single mailbox address, then parsing will fail.
+		/// </remarks>
+		/// <returns>The parsed <see cref="MimeKit.MailboxAddress"/>.</returns>
+		/// <param name="options">The parser options to use.</param>
+		/// <param name="text">The text.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <para><paramref name="options"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="text"/> is <c>null</c>.</para>
+		/// </exception>
+		/// <exception cref="MimeKit.ParseException">
+		/// <paramref name="text"/> could not be parsed.
+		/// </exception>
+		public static new MailboxAddress Parse (ParserOptions options, string text)
+		{
+			if (options == null)
+				throw new ArgumentNullException ("options");
+
+			if (text == null)
+				throw new ArgumentNullException ("text");
+
+			var buffer = Encoding.UTF8.GetBytes (text);
+			int endIndex = buffer.Length;
+			MailboxAddress mailbox;
+			int index = 0;
+
+			if (!TryParse (options, buffer, ref index, endIndex, true, out mailbox))
+				throw new ParseException ("No mailbox address found.", 0, 0);
+
+			ParseUtils.SkipCommentsAndWhiteSpace (buffer, ref index, endIndex, true);
+
+			if (index != endIndex)
+				throw new ParseException (string.Format ("Unexpected token at offset {0}", index), index, index);
+
+			return mailbox;
+		}
+
+		/// <summary>
+		/// Parses the given text into a new <see cref="MimeKit.MailboxAddress"/> instance.
+		/// </summary>
+		/// <remarks>
+		/// Parses a single <see cref="MailboxAddress"/>. If the address is not a mailbox address or
+		/// there is more than a single mailbox address, then parsing will fail.
+		/// </remarks>
+		/// <returns>The parsed <see cref="MimeKit.MailboxAddress"/>.</returns>
+		/// <param name="text">The text.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="text"/> is <c>null</c>.
+		/// </exception>
+		/// <exception cref="MimeKit.ParseException">
+		/// <paramref name="text"/> could not be parsed.
+		/// </exception>
+		public static new MailboxAddress Parse (string text)
+		{
+			return Parse (ParserOptions.Default, text);
 		}
 
 #if ENABLE_SNM

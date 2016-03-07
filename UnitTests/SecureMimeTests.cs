@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2014 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -30,6 +30,8 @@ using System.Collections.Generic;
 
 using NUnit.Framework;
 
+using Org.BouncyCastle.X509;
+
 using MimeKit;
 using MimeKit.Cryptography;
 
@@ -45,23 +47,44 @@ namespace UnitTests {
 		[TestFixtureSetUp]
 		public void SetUp ()
 		{
-			using (var ctx = (DefaultSecureMimeContext) CreateContext ()) {
+			using (var ctx = CreateContext ()) {
 				var dataDir = Path.Combine ("..", "..", "TestData", "smime");
 				string path;
+
+				CryptographyContext.Register (ctx.GetType ());
 
 				foreach (var filename in CertificateAuthorities) {
 					path = Path.Combine (dataDir, filename);
 					using (var file = File.OpenRead (path)) {
-						ctx.Import (file, true);
+						if (ctx is DefaultSecureMimeContext) {
+							((DefaultSecureMimeContext) ctx).Import (file, true);
+						} else {
+							var parser = new X509CertificateParser ();
+							foreach (X509Certificate certificate in parser.ReadCertificates (file))
+								ctx.Import (certificate);
+						}
 					}
 				}
 
 				path = Path.Combine (dataDir, "smime.p12");
 
-				using (var file = File.OpenRead (path)) {
+				using (var file = File.OpenRead (path))
 					ctx.Import (file, "no.secret");
-				}
 			}
+		}
+
+		[Test]
+		public void TestArgumentExceptions ()
+		{
+			var stream = new MemoryStream ();
+
+			Assert.Throws<ArgumentNullException> (() => new ApplicationPkcs7Signature ((MimeEntityConstructorArgs) null));
+			Assert.Throws<ArgumentNullException> (() => new ApplicationPkcs7Mime ((MimeEntityConstructorArgs) null));
+			Assert.Throws<ArgumentNullException> (() => new ApplicationPkcs7Signature ((Stream) null));
+
+			// Accept
+			Assert.Throws<ArgumentNullException> (() => new ApplicationPkcs7Mime (SecureMimeType.SignedData, stream).Accept (null));
+			Assert.Throws<ArgumentNullException> (() => new ApplicationPkcs7Signature (stream).Accept (null));
 		}
 
 		[Test]
@@ -299,7 +322,7 @@ namespace UnitTests {
 		public void TestSecureMimeSignAndEncrypt ()
 		{
 			var body = new TextPart ("plain") { Text = "This is some cleartext that we'll end up signing and encrypting..." };
-			var self = new SecureMailboxAddress ("MimeKit UnitTests", "mimekit@example.com", "b7dd33847c3308dd9e12b4c3c94b545d76ab5e41");
+			var self = new SecureMailboxAddress ("MimeKit UnitTests", "mimekit@example.com", "0a5f8a24c023ef1d4f9782ba145afc2812b511ef");
 			var message = new MimeMessage { Subject = "Test of signing and encrypting with S/MIME" };
 			ApplicationPkcs7Mime encrypted;
 
@@ -461,11 +484,29 @@ namespace UnitTests {
 	}
 
 	[TestFixture]
-	public class SecureMimeSqliteTests : SecureMimeTestsBase
+	public class SecureMimeTests : SecureMimeTestsBase
 	{
+		readonly TemporarySecureMimeContext ctx = new TemporarySecureMimeContext ();
+
 		protected override SecureMimeContext CreateContext ()
 		{
-			return new DefaultSecureMimeContext ("smime.db", "no.secret");
+			return ctx;
+		}
+	}
+
+	[TestFixture]
+	public class SecureMimeSqliteTests : SecureMimeTestsBase
+	{
+		class MySecureMimeContext : DefaultSecureMimeContext
+		{
+			public MySecureMimeContext () : base ("smime.db", "no.secret")
+			{
+			}
+		}
+
+		protected override SecureMimeContext CreateContext ()
+		{
+			return new MySecureMimeContext ();
 		}
 	}
 

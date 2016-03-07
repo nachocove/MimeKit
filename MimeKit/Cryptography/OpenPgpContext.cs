@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -27,6 +27,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Diagnostics;
 using System.Collections.Generic;
 
@@ -46,7 +47,109 @@ namespace MimeKit.Cryptography {
 	/// </remarks>
 	public abstract class OpenPgpContext : CryptographyContext
 	{
-		EncryptionAlgorithm defaultAlgorithm = EncryptionAlgorithm.Cast5;
+		EncryptionAlgorithm defaultAlgorithm;
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="MimeKit.Cryptography.OpenPgpContext"/> class.
+		/// </summary>
+		/// <remarks>
+		/// Subclasses choosing to use this constructor MUST set the <see cref="PublicKeyRingPath"/>,
+		/// <see cref="SecretKeyRingPath"/>, <see cref="PublicKeyRingBundle"/>, and the
+		/// <see cref="SecretKeyRingBundle"/> properties themselves.
+		/// </remarks>
+		protected OpenPgpContext ()
+		{
+			defaultAlgorithm = EncryptionAlgorithm.Cast5;
+		}
+
+#if PORTABLE
+		/// <summary>
+		/// Initializes a new instance of the <see cref="MimeKit.Cryptography.OpenPgpContext"/> class.
+		/// </summary>
+		/// <remarks>
+		/// Creates a new <see cref="OpenPgpContext"/> using the specified public and private keyrings.
+		/// </remarks>
+		/// <param name="pubring">The public keyring.</param>
+		/// <param name="secring">The secret keyring.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <para><paramref name="pubring"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="secring"/> is <c>null</c>.</para>
+		/// </exception>
+		/// <exception cref="System.IO.IOException">
+		/// An error occurred while reading one of the keyring files.
+		/// </exception>
+		/// <exception cref="Org.BouncyCastle.Bcpg.OpenPgp.PgpException">
+		/// An error occurred while parsing one of the keyring files.
+		/// </exception>
+		protected OpenPgpContext (Stream pubring, Stream secring) : this ()
+		{
+			if (pubring == null)
+				throw new ArgumentNullException ("pubring");
+
+			if (secring == null)
+				throw new ArgumentNullException ("secring");
+
+			PublicKeyRing = pubring;
+			SecretKeyRing = secring;
+
+			PublicKeyRingBundle = new PgpPublicKeyRingBundle (pubring);
+			SecretKeyRingBundle = new PgpSecretKeyRingBundle (secring);
+
+			if (pubring.CanSeek)
+				pubring.Seek (0, SeekOrigin.Begin);
+
+			if (secring.CanSeek)
+				secring.Seek (0, SeekOrigin.Begin);
+		}
+#else
+		/// <summary>
+		/// Initializes a new instance of the <see cref="MimeKit.Cryptography.OpenPgpContext"/> class.
+		/// </summary>
+		/// <remarks>
+		/// Creates a new <see cref="OpenPgpContext"/> using the specified public and private keyring paths.
+		/// </remarks>
+		/// <param name="pubring">The public keyring file path.</param>
+		/// <param name="secring">The secret keyring file path.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <para><paramref name="pubring"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="secring"/> is <c>null</c>.</para>
+		/// </exception>
+		/// <exception cref="System.IO.IOException">
+		/// An error occurred while reading one of the keyring files.
+		/// </exception>
+		/// <exception cref="Org.BouncyCastle.Bcpg.OpenPgp.PgpException">
+		/// An error occurred while parsing one of the keyring files.
+		/// </exception>
+		protected OpenPgpContext (string pubring, string secring) : this ()
+		{
+			if (pubring == null)
+				throw new ArgumentNullException ("pubring");
+
+			if (secring == null)
+				throw new ArgumentNullException ("secring");
+
+			PublicKeyRingPath = pubring;
+			SecretKeyRingPath = secring;
+
+			if (File.Exists (pubring)) {
+				using (var file = File.Open (pubring, FileMode.Open, FileAccess.Read)) {
+					PublicKeyRingBundle = new PgpPublicKeyRingBundle (file);
+				}
+			} else {
+				PublicKeyRingBundle = new PgpPublicKeyRingBundle (new byte[0]);
+			}
+
+			if (File.Exists (secring)) {
+				using (var file = File.Open (secring, FileMode.Open, FileAccess.Read)) {
+					SecretKeyRingBundle = new PgpSecretKeyRingBundle (file);
+				}
+			} else {
+				SecretKeyRingBundle = new PgpSecretKeyRingBundle (new byte[0]);
+			}
+		}
+#endif
 
 		/// <summary>
 		/// Gets or sets the default encryption algorithm.
@@ -66,6 +169,29 @@ namespace MimeKit.Cryptography {
 			}
 		}
 
+#if PORTABLE
+		/// <summary>
+		/// Gets the public keyring.
+		/// </summary>
+		/// <remarks>
+		/// Gets the public keyring.
+		/// </remarks>
+		/// <value>The public key ring.</value>
+		protected Stream PublicKeyRing {
+			get; set;
+		}
+
+		/// <summary>
+		/// Gets the secret keyring.
+		/// </summary>
+		/// <remarks>
+		/// Gets the secret keyring.
+		/// </remarks>
+		/// <value>The secret key ring.</value>
+		protected Stream SecretKeyRing {
+			get; set;
+		}
+#else
 		/// <summary>
 		/// Gets the public keyring path.
 		/// </summary>
@@ -87,6 +213,7 @@ namespace MimeKit.Cryptography {
 		protected string SecretKeyRingPath {
 			get; set;
 		}
+#endif
 
 		/// <summary>
 		/// Gets the public keyring bundle.
@@ -250,71 +377,14 @@ namespace MimeKit.Cryptography {
 			}
 		}
 
-		/// <summary>
-		/// Initializes a new instance of the <see cref="MimeKit.Cryptography.OpenPgpContext"/> class.
-		/// </summary>
-		/// <remarks>
-		/// Creates a new <see cref="OpenPgpContext"/> using the specified public and private keyring paths.
-		/// </remarks>
-		/// <param name="pubring">The public keyring file path.</param>
-		/// <param name="secring">The secret keyring file path.</param>
-		/// <exception cref="System.ArgumentNullException">
-		/// <para><paramref name="pubring"/> is <c>null</c>.</para>
-		/// <para>-or-</para>
-		/// <para><paramref name="secring"/> is <c>null</c>.</para>
-		/// </exception>
-		/// <exception cref="System.IO.IOException">
-		/// An error occurred while reading one of the keyring files.
-		/// </exception>
-		/// <exception cref="Org.BouncyCastle.Bcpg.OpenPgp.PgpException">
-		/// An error occurred while parsing one of the keyring files.
-		/// </exception>
-		protected OpenPgpContext (string pubring, string secring)
+		static string HexEncode (byte[] data)
 		{
-			if (pubring == null)
-				throw new ArgumentNullException ("pubring");
+			var fingerprint = new StringBuilder ();
 
-			if (secring == null)
-				throw new ArgumentNullException ("secring");
+			for (int i = 0; i < data.Length; i++)
+				fingerprint.Append (data[i].ToString ("x2"));
 
-			PublicKeyRingPath = pubring;
-			SecretKeyRingPath = secring;
-
-			if (File.Exists (pubring)) {
-				using (var file = File.OpenRead (pubring)) {
-					PublicKeyRingBundle = new PgpPublicKeyRingBundle (file);
-				}
-			} else {
-				PublicKeyRingBundle = new PgpPublicKeyRingBundle (new byte[0]);
-			}
-
-			if (File.Exists (secring)) {
-				using (var file = File.OpenRead (secring)) {
-					SecretKeyRingBundle = new PgpSecretKeyRingBundle (file);
-				}
-			} else {
-				SecretKeyRingBundle = new PgpSecretKeyRingBundle (new byte[0]);
-			}
-		}
-
-		/// <summary>
-		/// Initializes a new instance of the <see cref="MimeKit.Cryptography.OpenPgpContext"/> class.
-		/// </summary>
-		/// <remarks>
-		/// Subclasses choosing to use this constructor MUST set the <see cref="PublicKeyRingPath"/>,
-		/// <see cref="SecretKeyRingPath"/>, <see cref="PublicKeyRingBundle"/>, and the
-		/// <see cref="SecretKeyRingBundle"/> properties themselves.
-		/// </remarks>
-		protected OpenPgpContext ()
-		{
-		}
-
-		static string GetFingerprint (long keyId, int length)
-		{
-			if (length < 16)
-				return ((int) keyId).ToString ("X2");
-
-			return keyId.ToString ("X2");
+			return fingerprint.ToString ();
 		}
 
 		static bool PgpPublicKeyMatches (PgpPublicKey key, MailboxAddress mailbox)
@@ -322,9 +392,15 @@ namespace MimeKit.Cryptography {
 			var secure = mailbox as SecureMailboxAddress;
 
 			if (secure != null && !string.IsNullOrEmpty (secure.Fingerprint)) {
-				var fingerprint = GetFingerprint (key.KeyId, secure.Fingerprint.Length);
+				if (secure.Fingerprint.Length > 16) {
+					var fingerprint = HexEncode (key.GetFingerprint ());
 
-				return secure.Fingerprint.EndsWith (fingerprint, StringComparison.OrdinalIgnoreCase);
+					return secure.Fingerprint.Equals (fingerprint, StringComparison.OrdinalIgnoreCase);
+				} else {
+					var id = ((int) key.KeyId).ToString ("X2");
+
+					return secure.Fingerprint.EndsWith (id, StringComparison.OrdinalIgnoreCase);
+				}
 			}
 
 			foreach (string userId in key.GetUserIds ()) {
@@ -370,7 +446,7 @@ namespace MimeKit.Cryptography {
 					long seconds = key.GetValidSeconds ();
 					if (seconds != 0) {
 						var expires = key.CreationTime.AddSeconds ((double) seconds);
-						if (expires >= DateTime.Now)
+						if (expires <= DateTime.Now)
 							continue;
 					}
 
@@ -395,7 +471,7 @@ namespace MimeKit.Cryptography {
 		/// <exception cref="PublicKeyNotFoundException">
 		/// A public key for one or more of the <paramref name="mailboxes"/> could not be found.
 		/// </exception>
-		protected virtual IList<PgpPublicKey> GetPublicKeys (IEnumerable<MailboxAddress> mailboxes)
+		internal protected virtual IList<PgpPublicKey> GetPublicKeys (IEnumerable<MailboxAddress> mailboxes)
 		{
 			if (mailboxes == null)
 				throw new ArgumentNullException ("mailboxes");
@@ -413,9 +489,15 @@ namespace MimeKit.Cryptography {
 			var secure = mailbox as SecureMailboxAddress;
 
 			if (secure != null && !string.IsNullOrEmpty (secure.Fingerprint)) {
-				var fingerprint = GetFingerprint (key.KeyId, secure.Fingerprint.Length);
+				if (secure.Fingerprint.Length > 16) {
+					var fingerprint = HexEncode (key.PublicKey.GetFingerprint ());
 
-				return secure.Fingerprint.EndsWith (fingerprint, StringComparison.OrdinalIgnoreCase);
+					return secure.Fingerprint.Equals (fingerprint, StringComparison.OrdinalIgnoreCase);
+				} else {
+					var id = ((int) key.KeyId).ToString ("X2");
+
+					return secure.Fingerprint.EndsWith (id, StringComparison.OrdinalIgnoreCase);
+				}
 			}
 
 			foreach (string userId in key.UserIds) {
@@ -445,7 +527,7 @@ namespace MimeKit.Cryptography {
 		/// <exception cref="PrivateKeyNotFoundException">
 		/// A private key for the specified <paramref name="mailbox"/> could not be found.
 		/// </exception>
-		protected virtual PgpSecretKey GetSigningKey (MailboxAddress mailbox)
+		internal protected virtual PgpSecretKey GetSigningKey (MailboxAddress mailbox)
 		{
 			if (mailbox == null)
 				throw new ArgumentNullException ("mailbox");
@@ -465,7 +547,7 @@ namespace MimeKit.Cryptography {
 					long seconds = pubkey.GetValidSeconds ();
 					if (seconds != 0) {
 						var expires = pubkey.CreationTime.AddSeconds ((double) seconds);
-						if (DateTime.Now >= expires)
+						if (expires <= DateTime.Now)
 							continue;
 					}
 
@@ -587,8 +669,7 @@ namespace MimeKit.Cryptography {
 		/// <paramref name="digestAlgo"/> is out of range.
 		/// </exception>
 		/// <exception cref="System.NotSupportedException">
-		/// <paramref name="digestAlgo"/> does not have an equivalent
-		/// <see cref="Org.BouncyCastle.Bcpg.HashAlgorithmTag"/> value.
+		/// <paramref name="digestAlgo"/> is not a supported digest algorithm.
 		/// </exception>
 		public static HashAlgorithmTag GetHashAlgorithm (DigestAlgorithm digestAlgo)
 		{
@@ -596,15 +677,15 @@ namespace MimeKit.Cryptography {
 			case DigestAlgorithm.MD5:       return HashAlgorithmTag.MD5;
 			case DigestAlgorithm.Sha1:      return HashAlgorithmTag.Sha1;
 			case DigestAlgorithm.RipeMD160: return HashAlgorithmTag.RipeMD160;
-			case DigestAlgorithm.DoubleSha: return HashAlgorithmTag.DoubleSha;
+			case DigestAlgorithm.DoubleSha: throw new NotSupportedException ("The Double SHA digest algorithm is not supported.");
 			case DigestAlgorithm.MD2:       return HashAlgorithmTag.MD2;
-			case DigestAlgorithm.Tiger192:  return HashAlgorithmTag.Tiger192;
-			case DigestAlgorithm.Haval5160: return HashAlgorithmTag.Haval5pass160;
+			case DigestAlgorithm.Tiger192:  throw new NotSupportedException ("The Tiger-192 digest algorithm is not supported.");
+			case DigestAlgorithm.Haval5160: throw new NotSupportedException ("The HAVAL 5 160 digest algorithm is not supported.");
 			case DigestAlgorithm.Sha256:    return HashAlgorithmTag.Sha256;
 			case DigestAlgorithm.Sha384:    return HashAlgorithmTag.Sha384;
 			case DigestAlgorithm.Sha512:    return HashAlgorithmTag.Sha512;
 			case DigestAlgorithm.Sha224:    return HashAlgorithmTag.Sha224;
-			case DigestAlgorithm.MD4: throw new NotSupportedException ("The MD4 digest algorithm is not supported.");
+			case DigestAlgorithm.MD4:       throw new NotSupportedException ("The MD4 digest algorithm is not supported.");
 			default: throw new ArgumentOutOfRangeException ("digestAlgo");
 			}
 		}
@@ -782,7 +863,7 @@ namespace MimeKit.Cryptography {
 			case PublicKeyAlgorithmTag.RsaSign:        return PublicKeyAlgorithm.RsaSign;
 			case PublicKeyAlgorithmTag.ElGamalEncrypt: return PublicKeyAlgorithm.ElGamalEncrypt;
 			case PublicKeyAlgorithmTag.Dsa:            return PublicKeyAlgorithm.Dsa;
-			case PublicKeyAlgorithmTag.EC:             return PublicKeyAlgorithm.EllipticCurve;
+			case PublicKeyAlgorithmTag.ECDH:           return PublicKeyAlgorithm.EllipticCurve;
 			case PublicKeyAlgorithmTag.ECDsa:          return PublicKeyAlgorithm.EllipticCurveDsa;
 			case PublicKeyAlgorithmTag.ElGamalGeneral: return PublicKeyAlgorithm.ElGamalGeneral;
 			case PublicKeyAlgorithmTag.DiffieHellman:  return PublicKeyAlgorithm.DiffieHellman;
@@ -810,28 +891,11 @@ namespace MimeKit.Cryptography {
 				signatures.Add (signature);
 			}
 
-			var memory = content as MemoryStream;
-			if (memory != null) {
-				// We can optimize things a bit if we've got a memory stream...
-				var buffer = memory.GetBuffer ();
-
-				for (int index = (int) memory.Position; index < (int) memory.Length; index++) {
-					byte c = buffer[index];
-
-					for (int i = 0; i < signatures.Count; i++) {
-						if (signatures[i].SignerCertificate != null) {
-							var pgp = (OpenPgpDigitalSignature) signatures[i];
-							pgp.Signature.Update (c);
-						}
-					}
-				}
-			} else {
-				while ((nread = content.Read (buf, 0, buf.Length)) > 0) {
-					for (int i = 0; i < signatures.Count; i++) {
-						if (signatures[i].SignerCertificate != null) {
-							var pgp = (OpenPgpDigitalSignature) signatures[i];
-							pgp.Signature.Update (buf, 0, nread);
-						}
+			while ((nread = content.Read (buf, 0, buf.Length)) > 0) {
+				for (int i = 0; i < signatures.Count; i++) {
+					if (signatures[i].SignerCertificate != null) {
+						var pgp = (OpenPgpDigitalSignature) signatures[i];
+						pgp.Signature.Update (buf, 0, nread);
 					}
 				}
 			}
@@ -876,41 +940,6 @@ namespace MimeKit.Cryptography {
 
 				return GetDigitalSignatures (signatureList, content);
 			}
-		}
-
-		/// <summary>
-		/// Encrypts the specified content for the specified recipients.
-		/// </summary>
-		/// <remarks>
-		/// Encrypts the specified content for the specified recipients.
-		/// </remarks>
-		/// <returns>A new <see cref="MimeKit.MimePart"/> instance
-		/// containing the encrypted data.</returns>
-		/// <param name="recipients">The recipients.</param>
-		/// <param name="content">The content.</param>
-		/// <exception cref="System.ArgumentNullException">
-		/// <para><paramref name="recipients"/> is <c>null</c>.</para>
-		/// <para>-or-</para>
-		/// <para><paramref name="content"/> is <c>null</c>.</para>
-		/// </exception>
-		/// <exception cref="System.ArgumentException">
-		/// <para>One or more of the recipient keys cannot be used for encrypting.</para>
-		/// <para>-or-</para>
-		/// <para>No recipients were specified.</para>
-		/// </exception>
-		/// <exception cref="PublicKeyNotFoundException">
-		/// A public key could not be found for one or more of the <paramref name="recipients"/>.
-		/// </exception>
-		public override MimePart Encrypt (IEnumerable<MailboxAddress> recipients, Stream content)
-		{
-			if (recipients == null)
-				throw new ArgumentNullException ("recipients");
-
-			if (content == null)
-				throw new ArgumentNullException ("content");
-
-			// TODO: document the exceptions that can be thrown by BouncyCastle
-			return Encrypt (GetPublicKeys (recipients), content);
 		}
 
 		static Stream Compress (Stream content)
@@ -969,8 +998,82 @@ namespace MimeKit.Cryptography {
 			case EncryptionAlgorithm.Idea:        return SymmetricKeyAlgorithmTag.Idea;
 			case EncryptionAlgorithm.Blowfish:    return SymmetricKeyAlgorithmTag.Blowfish;
 			case EncryptionAlgorithm.Twofish:     return SymmetricKeyAlgorithmTag.Twofish;
-			default: throw new NotSupportedException ();
+			default: throw new NotSupportedException (string.Format ("{0} is not supported.", algorithm));
 			}
+		}
+
+		/// <summary>
+		/// Encrypts the specified content for the specified recipients.
+		/// </summary>
+		/// <remarks>
+		/// Encrypts the specified content for the specified recipients.
+		/// </remarks>
+		/// <returns>A new <see cref="MimeKit.MimePart"/> instance
+		/// containing the encrypted data.</returns>
+		/// <param name="recipients">The recipients.</param>
+		/// <param name="content">The content.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <para><paramref name="recipients"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="content"/> is <c>null</c>.</para>
+		/// </exception>
+		/// <exception cref="System.ArgumentException">
+		/// <para>One or more of the recipient keys cannot be used for encrypting.</para>
+		/// <para>-or-</para>
+		/// <para>No recipients were specified.</para>
+		/// </exception>
+		/// <exception cref="PublicKeyNotFoundException">
+		/// A public key could not be found for one or more of the <paramref name="recipients"/>.
+		/// </exception>
+		public override MimePart Encrypt (IEnumerable<MailboxAddress> recipients, Stream content)
+		{
+			if (recipients == null)
+				throw new ArgumentNullException ("recipients");
+
+			if (content == null)
+				throw new ArgumentNullException ("content");
+
+			// TODO: document the exceptions that can be thrown by BouncyCastle
+			return Encrypt (GetPublicKeys (recipients), content);
+		}
+
+		/// <summary>
+		/// Encrypts the specified content for the specified recipients.
+		/// </summary>
+		/// <remarks>
+		/// Encrypts the specified content for the specified recipients.
+		/// </remarks>
+		/// <returns>A new <see cref="MimeKit.MimePart"/> instance
+		/// containing the encrypted data.</returns>
+		/// <param name="algorithm">The encryption algorithm.</param>
+		/// <param name="recipients">The recipients.</param>
+		/// <param name="content">The content.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <para><paramref name="recipients"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="content"/> is <c>null</c>.</para>
+		/// </exception>
+		/// <exception cref="System.ArgumentException">
+		/// <para>One or more of the recipient keys cannot be used for encrypting.</para>
+		/// <para>-or-</para>
+		/// <para>No recipients were specified.</para>
+		/// </exception>
+		/// <exception cref="PublicKeyNotFoundException">
+		/// A public key could not be found for one or more of the <paramref name="recipients"/>.
+		/// </exception>
+		/// <exception cref="System.NotSupportedException">
+		/// The specified encryption algorithm is not supported.
+		/// </exception>
+		public MimePart Encrypt (EncryptionAlgorithm algorithm, IEnumerable<MailboxAddress> recipients, Stream content)
+		{
+			if (recipients == null)
+				throw new ArgumentNullException ("recipients");
+
+			if (content == null)
+				throw new ArgumentNullException ("content");
+
+			// TODO: document the exceptions that can be thrown by BouncyCastle
+			return Encrypt (algorithm, GetPublicKeys (recipients), content);
 		}
 
 		/// <summary>
@@ -1025,7 +1128,7 @@ namespace MimeKit.Cryptography {
 			var encrypted = Encrypt (encrypter, content);
 
 			return new MimePart ("application", "octet-stream") {
-				ContentDisposition = new ContentDisposition ("attachment"),
+				ContentDisposition = new ContentDisposition (ContentDisposition.Attachment),
 				ContentObject = new ContentObject (encrypted),
 			};
 		}
@@ -1149,6 +1252,58 @@ namespace MimeKit.Cryptography {
 		/// <exception cref="System.UnauthorizedAccessException">
 		/// 3 bad attempts were made to unlock the secret key.
 		/// </exception>
+		public MimePart SignAndEncrypt (MailboxAddress signer, DigestAlgorithm digestAlgo, EncryptionAlgorithm cipherAlgo, IEnumerable<MailboxAddress> recipients, Stream content)
+		{
+			if (signer == null)
+				throw new ArgumentNullException ("signer");
+
+			if (recipients == null)
+				throw new ArgumentNullException ("recipients");
+
+			if (content == null)
+				throw new ArgumentNullException ("content");
+
+			var key = GetSigningKey (signer);
+
+			return SignAndEncrypt (key, digestAlgo, cipherAlgo, GetPublicKeys (recipients), content);
+		}
+
+		/// <summary>
+		/// Cryptographically signs and encrypts the specified content for the specified recipients.
+		/// </summary>
+		/// <remarks>
+		/// Cryptographically signs and encrypts the specified content for the specified recipients.
+		/// </remarks>
+		/// <returns>A new <see cref="MimeKit.MimePart"/> instance
+		/// containing the encrypted data.</returns>
+		/// <param name="signer">The signer.</param>
+		/// <param name="digestAlgo">The digest algorithm to use for signing.</param>
+		/// <param name="cipherAlgo">The encryption algorithm.</param>
+		/// <param name="recipients">The recipients.</param>
+		/// <param name="content">The content.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <para><paramref name="signer"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="recipients"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="content"/> is <c>null</c>.</para>
+		/// </exception>
+		/// <exception cref="System.ArgumentException">
+		/// <para><paramref name="signer"/> cannot be used for signing.</para>
+		/// <para>-or-</para>
+		/// <para>One or more of the recipient keys cannot be used for encrypting.</para>
+		/// <para>-or-</para>
+		/// <para>No recipients were specified.</para>
+		/// </exception>
+		/// <exception cref="System.NotSupportedException">
+		/// The specified encryption algorithm is not supported.
+		/// </exception>
+		/// <exception cref="System.OperationCanceledException">
+		/// The user chose to cancel the password prompt.
+		/// </exception>
+		/// <exception cref="System.UnauthorizedAccessException">
+		/// 3 bad attempts were made to unlock the secret key.
+		/// </exception>
 		public MimePart SignAndEncrypt (PgpSecretKey signer, DigestAlgorithm digestAlgo, EncryptionAlgorithm cipherAlgo, IEnumerable<PgpPublicKey> recipients, Stream content)
 		{
 			if (signer == null)
@@ -1233,7 +1388,7 @@ namespace MimeKit.Cryptography {
 				memory.Position = 0;
 
 				return new MimePart ("application", "octet-stream") {
-					ContentDisposition = new ContentDisposition ("attachment"),
+					ContentDisposition = new ContentDisposition (ContentDisposition.Attachment),
 					ContentObject = new ContentObject (memory)
 				};
 			}
@@ -1543,13 +1698,14 @@ namespace MimeKit.Cryptography {
 		/// </summary>
 		/// <remarks>
 		/// <para>Atomically saves the public key-ring bundle to the path specified by <see cref="PublicKeyRingPath"/>.</para>
-		/// <para>Called by <see cref="Import"/> if any public keys were successfully imported.</para>
+		/// <para>Called by <see cref="Import(Stream)"/> if any public keys were successfully imported.</para>
 		/// </remarks>
 		/// <exception cref="System.IO.IOException">
 		/// An error occured while saving the public key-ring bundle.
 		/// </exception>
 		protected void SavePublicKeyRingBundle ()
 		{
+#if !PORTABLE
 			var filename = Path.GetFileName (PublicKeyRingPath) + "~";
 			var dirname = Path.GetDirectoryName (PublicKeyRingPath);
 			var tmp = Path.Combine (dirname, "." + filename);
@@ -1558,15 +1714,27 @@ namespace MimeKit.Cryptography {
 			if (!Directory.Exists (dirname))
 				Directory.CreateDirectory (dirname);
 
-			using (var file = File.OpenWrite (tmp)) {
+			using (var file = File.Open (tmp, FileMode.Create, FileAccess.Write)) {
 				PublicKeyRingBundle.Encode (file);
 				file.Flush ();
 			}
 
-			if (File.Exists (PublicKeyRingPath))
+			if (File.Exists (PublicKeyRingPath)) {
+#if !COREFX
 				File.Replace (tmp, PublicKeyRingPath, bak);
-			else
+#else
+				if (File.Exists (bak))
+					File.Delete (bak);
+				File.Move (PublicKeyRingPath, bak);
 				File.Move (tmp, PublicKeyRingPath);
+#endif
+			} else {
+				File.Move (tmp, PublicKeyRingPath);
+			}
+#else
+			PublicKeyRingBundle.Encode (PublicKeyRing);
+			PublicKeyRing.Seek (0, SeekOrigin.Begin);
+#endif
 		}
 
 		/// <summary>
@@ -1581,6 +1749,7 @@ namespace MimeKit.Cryptography {
 		/// </exception>
 		protected void SaveSecretKeyRingBundle ()
 		{
+#if !PORTABLE
 			var filename = Path.GetFileName (SecretKeyRingPath) + "~";
 			var dirname = Path.GetDirectoryName (SecretKeyRingPath);
 			var tmp = Path.Combine (dirname, "." + filename);
@@ -1589,15 +1758,77 @@ namespace MimeKit.Cryptography {
 			if (!Directory.Exists (dirname))
 				Directory.CreateDirectory (dirname);
 
-			using (var file = File.OpenWrite (tmp)) {
+			using (var file = File.Open (tmp, FileMode.Create, FileAccess.Write)) {
 				SecretKeyRingBundle.Encode (file);
 				file.Flush ();
 			}
 
-			if (File.Exists (SecretKeyRingPath))
+			if (File.Exists (SecretKeyRingPath)) {
+#if !COREFX
 				File.Replace (tmp, SecretKeyRingPath, bak);
-			else
+#else
+				if (File.Exists (bak))
+					File.Delete (bak);
+				File.Move (SecretKeyRingPath, bak);
 				File.Move (tmp, SecretKeyRingPath);
+#endif
+			} else {
+				File.Move (tmp, SecretKeyRingPath);
+			}
+#else
+			SecretKeyRingBundle.Encode (SecretKeyRing);
+			SecretKeyRing.Seek (0, SeekOrigin.Begin);
+#endif
+		}
+
+		/// <summary>
+		/// Imports a public pgp keyring.
+		/// </summary>
+		/// <remarks>
+		/// Imports a public pgp keyring.
+		/// </remarks>
+		/// <param name="keyring">The pgp keyring.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="keyring"/> is <c>null</c>.
+		/// </exception>
+		public void Import (PgpPublicKeyRing keyring)
+		{
+			if (keyring == null)
+				throw new ArgumentNullException ("keyring");
+
+			if (PublicKeyRingBundle.Contains (keyring.GetPublicKey ().KeyId))
+				return;
+
+			PublicKeyRingBundle = PgpPublicKeyRingBundle.AddPublicKeyRing (PublicKeyRingBundle, keyring);
+			SavePublicKeyRingBundle ();
+		}
+
+		/// <summary>
+		/// Imports a public pgp keyring bundle.
+		/// </summary>
+		/// <remarks>
+		/// Imports a public pgp keyring bundle.
+		/// </remarks>
+		/// <param name="bundle">The pgp keyring bundle.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="bundle"/> is <c>null</c>.
+		/// </exception>
+		public void Import (PgpPublicKeyRingBundle bundle)
+		{
+			if (bundle == null)
+				throw new ArgumentNullException ("bundle");
+
+			int publicKeysAdded = 0;
+
+			foreach (PgpPublicKeyRing pubring in bundle.GetKeyRings ()) {
+				if (!PublicKeyRingBundle.Contains (pubring.GetPublicKey ().KeyId)) {
+					PublicKeyRingBundle = PgpPublicKeyRingBundle.AddPublicKeyRing (PublicKeyRingBundle, pubring);
+					publicKeysAdded++;
+				}
+			}
+
+			if (publicKeysAdded > 0)
+				SavePublicKeyRingBundle ();
 		}
 
 		/// <summary>
@@ -1620,30 +1851,67 @@ namespace MimeKit.Cryptography {
 			if (stream == null)
 				throw new ArgumentNullException ("stream");
 
-			using (var armored = new ArmoredInputStream (stream)) {
-				var imported = new PgpPublicKeyRingBundle (armored);
-				if (imported.Count == 0)
-					return;
+			using (var armored = new ArmoredInputStream (stream))
+				Import (new PgpPublicKeyRingBundle (armored));
+		}
 
-				int publicKeysAdded = 0;
+		/// <summary>
+		/// Imports a secret pgp keyring.
+		/// </summary>
+		/// <remarks>
+		/// Imports a secret pgp keyring.
+		/// </remarks>
+		/// <param name="keyring">The pgp keyring.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="keyring"/> is <c>null</c>.
+		/// </exception>
+		public void Import (PgpSecretKeyRing keyring)
+		{
+			if (keyring == null)
+				throw new ArgumentNullException ("keyring");
 
-				foreach (PgpPublicKeyRing pubring in imported.GetKeyRings ()) {
-					if (!PublicKeyRingBundle.Contains (pubring.GetPublicKey ().KeyId)) {
-						PublicKeyRingBundle = PgpPublicKeyRingBundle.AddPublicKeyRing (PublicKeyRingBundle, pubring);
-						publicKeysAdded++;
-					}
+			if (SecretKeyRingBundle.Contains (keyring.GetSecretKey ().KeyId))
+				return;
+
+			SecretKeyRingBundle = PgpSecretKeyRingBundle.AddSecretKeyRing (SecretKeyRingBundle, keyring);
+			SaveSecretKeyRingBundle ();
+		}
+
+		/// <summary>
+		/// Imports a secret pgp keyring bundle.
+		/// </summary>
+		/// <remarks>
+		/// Imports a secret pgp keyring bundle.
+		/// </remarks>
+		/// <param name="bundle">The pgp keyring bundle.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="bundle"/> is <c>null</c>.
+		/// </exception>
+		public void Import (PgpSecretKeyRingBundle bundle)
+		{
+			if (bundle == null)
+				throw new ArgumentNullException ("bundle");
+
+			int secretKeysAdded = 0;
+
+			foreach (PgpSecretKeyRing secring in bundle.GetKeyRings ()) {
+				if (!SecretKeyRingBundle.Contains (secring.GetSecretKey ().KeyId)) {
+					SecretKeyRingBundle = PgpSecretKeyRingBundle.AddSecretKeyRing (SecretKeyRingBundle, secring);
+					secretKeysAdded++;
 				}
-
-				if (publicKeysAdded > 0)
-					SavePublicKeyRingBundle ();
 			}
+
+			if (secretKeysAdded > 0)
+				SaveSecretKeyRingBundle ();
 		}
 
 		/// <summary>
 		/// Imports secret pgp keys from the specified stream.
 		/// </summary>
 		/// <remarks>
-		/// Imports secret pgp keys from the specified stream.
+		/// <para>Imports secret pgp keys from the specified stream.</para>
+		/// <para>The stream should consist of an armored secret keyring bundle
+		/// containing 1 or more secret keyrings.</para>
 		/// </remarks>
 		/// <param name="rawData">The raw key data.</param>
 		/// <exception cref="System.ArgumentNullException">
@@ -1654,28 +1922,14 @@ namespace MimeKit.Cryptography {
 		/// <para>-or-</para>
 		/// <para>An error occured while saving the public key-ring bundle.</para>
 		/// </exception>
+		[Obsolete ("Use Import(PgpSecretKeyRingBundle) or Import(PgpSecretKeyRing)")]
 		public virtual void ImportSecretKeys (Stream rawData)
 		{
 			if (rawData == null)
 				throw new ArgumentNullException ("rawData");
 
-			using (var armored = new ArmoredInputStream (rawData)) {
-				var imported = new PgpSecretKeyRingBundle (armored);
-				if (imported.Count == 0)
-					return;
-
-				int secretKeysAdded = 0;
-
-				foreach (PgpSecretKeyRing secring in imported.GetKeyRings ()) {
-					if (!SecretKeyRingBundle.Contains (secring.GetSecretKey ().KeyId)) {
-						SecretKeyRingBundle = PgpSecretKeyRingBundle.AddSecretKeyRing (SecretKeyRingBundle, secring);
-						secretKeysAdded++;
-					}
-				}
-
-				if (secretKeysAdded > 0)
-					SaveSecretKeyRingBundle ();
-			}
+			using (var armored = new ArmoredInputStream (rawData))
+				Import (new PgpSecretKeyRingBundle (armored));
 		}
 
 		/// <summary>
@@ -1748,7 +2002,7 @@ namespace MimeKit.Cryptography {
 			content.Position = 0;
 
 			return new MimePart ("application", "pgp-keys") {
-				ContentDisposition = new ContentDisposition ("attachment"),
+				ContentDisposition = new ContentDisposition (ContentDisposition.Attachment),
 				ContentObject = new ContentObject (content)
 			};
 		}

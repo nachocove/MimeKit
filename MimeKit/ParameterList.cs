@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc.
+// Copyright (c) 2013-2016 Xamarin Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -59,7 +59,7 @@ namespace MimeKit {
 		/// </remarks>
 		public ParameterList ()
 		{
-			table = new Dictionary<string, Parameter> (StringComparer.OrdinalIgnoreCase);
+			table = new Dictionary<string, Parameter> (MimeUtils.OrdinalIgnoreCase);
 			parameters = new List<Parameter> ();
 		}
 
@@ -82,6 +82,59 @@ namespace MimeKit {
 		public void Add (string name, string value)
 		{
 			Add (new Parameter (name, value));
+		}
+
+		/// <summary>
+		/// Adds a parameter with the specified name and value.
+		/// </summary>
+		/// <remarks>
+		/// Adds a new parameter to the list with the specified name and value.
+		/// </remarks>
+		/// <param name="encoding">The character encoding.</param>
+		/// <param name="name">The parameter name.</param>
+		/// <param name="value">The parameter value.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <para><paramref name="encoding"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="name"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="value"/> is <c>null</c>.</para>
+		/// </exception>
+		/// <exception cref="System.ArgumentException">
+		/// <paramref name="name"/> contains illegal characters.
+		/// </exception>
+		public void Add (Encoding encoding, string name, string value)
+		{
+			Add (new Parameter (encoding, name, value));
+		}
+
+		/// <summary>
+		/// Adds a parameter with the specified name and value.
+		/// </summary>
+		/// <remarks>
+		/// Adds a new parameter to the list with the specified name and value.
+		/// </remarks>
+		/// <param name="charset">The character encoding.</param>
+		/// <param name="name">The parameter name.</param>
+		/// <param name="value">The parameter value.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <para><paramref name="charset"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="name"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="value"/> is <c>null</c>.</para>
+		/// </exception>
+		/// <exception cref="System.ArgumentException">
+		/// <para><paramref name="charset"/> cannot be empty.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="name"/> contains illegal characters.</para>
+		/// </exception>
+		/// <exception cref="System.NotSupportedException">
+		/// <paramref name="charset"/> is not supported.
+		/// </exception>
+		public void Add (string charset, string name, string value)
+		{
+			Add (new Parameter (charset, name, value));
 		}
 
 		/// <summary>
@@ -121,7 +174,7 @@ namespace MimeKit {
 				throw new ArgumentNullException ("name");
 
 			for (int i = 0; i < parameters.Count; i++) {
-				if (parameters[i].Name == name)
+				if (name.Equals (parameters[i].Name, StringComparison.OrdinalIgnoreCase))
 					return i;
 			}
 
@@ -221,6 +274,26 @@ namespace MimeKit {
 					Add (name, value);
 				}
 			}
+		}
+
+		/// <summary>
+		/// Gets the parameter with the specified name.
+		/// </summary>
+		/// <remarks>
+		/// Gets the parameter with the specified name.
+		/// </remarks>
+		/// <returns><c>true</c> if the parameter exists; otherwise, <c>false</c>.</returns>
+		/// <param name="name">The parameter name.</param>
+		/// <param name="param">The parameter.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="name"/> is <c>null</c>.
+		/// </exception>
+		public bool TryGetValue (string name, out Parameter param)
+		{
+			if (name == null)
+				throw new ArgumentNullException ("name");
+
+			return table.TryGetValue (name, out param);
 		}
 
 		/// <summary>
@@ -720,12 +793,10 @@ namespace MimeKit {
 				return false;
 
 			if (index >= endIndex) {
-				if (index >= endIndex) {
-					if (throwOnError)
-						throw new ParseException (string.Format ("Incomplete parameter at offset {0}", startIndex), startIndex, index);
+				if (throwOnError)
+					throw new ParseException (string.Format ("Incomplete parameter at offset {0}", startIndex), startIndex, index);
 
-					return false;
-				}
+				return false;
 			}
 
 			valueIndex = index;
@@ -816,7 +887,7 @@ namespace MimeKit {
 			return true;
 		}
 
-		static string DecodeRfc2184 (ref Decoder decoder, HexDecoder hex, byte[] text, int startIndex, int count, bool flush)
+		static string DecodeRfc2231 (out Encoding encoding, ref Decoder decoder, HexDecoder hex, byte[] text, int startIndex, int count, bool flush)
 		{
 			int endIndex = startIndex + count;
 			int index = startIndex;
@@ -826,18 +897,20 @@ namespace MimeKit {
 			if (decoder == null) {
 				if (TryGetCharset (text, ref index, endIndex, out charset)) {
 					try {
-						var encoding = CharsetUtils.GetEncoding (charset, "?");
+						encoding = CharsetUtils.GetEncoding (charset, "?");
 						decoder = (Decoder) encoding.GetDecoder ();
 					} catch (NotSupportedException) {
-						var encoding = Encoding.GetEncoding (28591); // iso-8859-1
+						encoding = Encoding.GetEncoding (28591); // iso-8859-1
 						decoder = (Decoder) encoding.GetDecoder ();
 					}
 				} else {
 					// When no charset is specified, it should be safe to assume US-ASCII...
 					// but we all know what assume means, right??
-					var encoding = Encoding.GetEncoding (28591); // iso-8859-1
+					encoding = Encoding.GetEncoding (28591); // iso-8859-1
 					decoder = (Decoder) encoding.GetDecoder ();
 				}
+			} else {
+				encoding = null;
 			}
 
 			int length = endIndex - index;
@@ -856,7 +929,7 @@ namespace MimeKit {
 
 		internal static bool TryParse (ParserOptions options, byte[] text, ref int index, int endIndex, bool throwOnError, out ParameterList paramList)
 		{
-			var rfc2184 = new Dictionary<string, List<NameValuePair>> (StringComparer.OrdinalIgnoreCase);
+			var rfc2231 = new Dictionary<string, List<NameValuePair>> (MimeUtils.OrdinalIgnoreCase);
 			var @params = new List<NameValuePair> ();
 			List<NameValuePair> parts;
 
@@ -883,11 +956,11 @@ namespace MimeKit {
 					return false;
 
 				if (pair.Id.HasValue) {
-					if (rfc2184.TryGetValue (pair.Name, out parts)) {
+					if (rfc2231.TryGetValue (pair.Name, out parts)) {
 						parts.Add (pair);
 					} else {
 						parts = new List<NameValuePair> ();
-						rfc2184[pair.Name] = parts;
+						rfc2231[pair.Name] = parts;
 						@params.Add (pair);
 						parts.Add (pair);
 					}
@@ -912,17 +985,22 @@ namespace MimeKit {
 			var hex = new HexDecoder ();
 
 			foreach (var param in @params) {
+				var method = ParameterEncodingMethod.Default;
 				int startIndex = param.ValueStart;
 				int length = param.ValueLength;
 				var buffer = param.Value;
+				Encoding encoding = null;
 				Decoder decoder = null;
+				Parameter parameter;
 				string value;
 
 				if (param.Id.HasValue) {
-					parts = rfc2184[param.Name];
+					method = ParameterEncodingMethod.Rfc2231;
+					parts = rfc2231[param.Name];
 					parts.Sort ();
 
 					value = string.Empty;
+
 					for (int i = 0; i < parts.Count; i++) {
 						startIndex = parts[i].ValueStart;
 						length = parts[i].ValueLength;
@@ -930,6 +1008,7 @@ namespace MimeKit {
 
 						if (parts[i].Encoded) {
 							bool flush = i + 1 >= parts.Count || !parts[i + 1].Encoded;
+							Encoding charset;
 
 							// Note: Some mail clients mistakenly quote encoded parameter values when they shouldn't
 							if (length >= 2 && buffer[startIndex] == (byte) '"' && buffer[startIndex + length - 1] == (byte) '"') {
@@ -937,7 +1016,8 @@ namespace MimeKit {
 								length -= 2;
 							}
 
-							value += DecodeRfc2184 (ref decoder, hex, buffer, startIndex, length, flush);
+							value += DecodeRfc2231 (out charset, ref decoder, hex, buffer, startIndex, length, flush);
+							encoding = encoding ?? charset;
 						} else if (length >= 2 && buffer[startIndex] == (byte) '"') {
 							var quoted = CharsetUtils.ConvertToUnicode (options,buffer, startIndex, length);
 							value += MimeUtils.Unquote (quoted);
@@ -949,31 +1029,50 @@ namespace MimeKit {
 					}
 					hex.Reset ();
 				} else if (param.Encoded) {
-					value = DecodeRfc2184 (ref decoder, hex, buffer, startIndex, length, true);
+					value = DecodeRfc2231 (out encoding, ref decoder, hex, buffer, startIndex, length, true);
+					method = ParameterEncodingMethod.Rfc2231;
 					hex.Reset ();
 				} else if (!paramList.Contains (param.Name)) {
-					// Note: If we've got an rfc2184-encoded version of the same parameter, then
+					// Note: If we've got an rfc2231-encoded version of the same parameter, then
 					// we'll want to choose that one as opposed to the ASCII variant (i.e. this one).
 					//
 					// While most mail clients that I know of do not send multiple parameters of the
 					// same name, rfc6266 suggests that HTTP servers are using this approach to work
-					// around HTTP clients that do not (yet) implement support for the rfc2184/2231
+					// around HTTP clients that do not (yet) implement support for the rfc2231
 					// encoding of parameter values. Since none of the MIME specifications provide
 					// any suggestions for dealing with this, following rfc6266 seems to make the
 					// most sense, even though it is meant for HTTP clients and servers.
+					int codepage = -1;
+
 					if (length >= 2 && text[startIndex] == (byte) '"') {
-						var quoted = Rfc2047.DecodeText (options, buffer, startIndex, length);
+						var quoted = Rfc2047.DecodeText (options, buffer, startIndex, length, out codepage);
 						value = MimeUtils.Unquote (quoted);
 					} else if (length > 0) {
-						value = Rfc2047.DecodeText (options, buffer, startIndex, length);
+						value = Rfc2047.DecodeText (options, buffer, startIndex, length, out codepage);
 					} else {
 						value = string.Empty;
+					}
+
+					if (codepage != -1 && codepage != 65001) {
+						encoding = CharsetUtils.GetEncoding (codepage);
+						method = ParameterEncodingMethod.Rfc2047;
 					}
 				} else {
 					continue;
 				}
 
-				paramList[param.Name] = value;
+				if (paramList.table.TryGetValue (param.Name, out parameter)) {
+					parameter.Encoding = encoding;
+					parameter.Value = value;
+				} else if (encoding != null) {
+					paramList.Add (encoding, param.Name, value);
+					parameter = paramList[paramList.Count - 1];
+				} else {
+					paramList.Add (param.Name, value);
+					parameter = paramList[paramList.Count - 1];
+				}
+
+				parameter.EncodingMethod = method;
 			}
 
 			return true;

@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -184,7 +184,7 @@ namespace MimeKit.Cryptography {
 		/// </exception>
 		protected override CmsRecipient GetCmsRecipient (MailboxAddress mailbox)
 		{
-			var now = DateTime.Now;
+			var now = DateTime.UtcNow;
 
 			foreach (var certificate in certificates) {
 				if (certificate.NotBefore > now || certificate.NotAfter < now)
@@ -196,7 +196,7 @@ namespace MimeKit.Cryptography {
 
 				var address = certificate.GetSubjectEmailAddress ();
 
-				if (address.Equals (mailbox.Address, StringComparison.InvariantCultureIgnoreCase)) {
+				if (address.Equals (mailbox.Address, StringComparison.OrdinalIgnoreCase)) {
 					var recipient = new CmsRecipient (certificate);
 					EncryptionAlgorithm[] algorithms;
 
@@ -228,7 +228,7 @@ namespace MimeKit.Cryptography {
 		/// </exception>
 		protected override CmsSigner GetCmsSigner (MailboxAddress mailbox, DigestAlgorithm digestAlgo)
 		{
-			var now = DateTime.Now;
+			var now = DateTime.UtcNow;
 
 			foreach (var certificate in certificates) {
 				AsymmetricKeyParameter key;
@@ -245,7 +245,7 @@ namespace MimeKit.Cryptography {
 
 				var address = certificate.GetSubjectEmailAddress ();
 
-				if (address.Equals (mailbox.Address, StringComparison.InvariantCultureIgnoreCase)) {
+				if (address.Equals (mailbox.Address, StringComparison.OrdinalIgnoreCase)) {
 					var signer = new CmsSigner (certificate, key);
 					signer.DigestAlgorithm = digestAlgo;
 					return signer;
@@ -275,7 +275,7 @@ namespace MimeKit.Cryptography {
 		/// <remarks>
 		/// Imports certificates and keys from a pkcs12-encoded stream.
 		/// </remarks>
-		/// <param name="stream">The raw certificate and key data.</param>
+		/// <param name="stream">The raw certificate and key data in pkcs12 format.</param>
 		/// <param name="password">The password to unlock the stream.</param>
 		/// <exception cref="System.ArgumentNullException">
 		/// <para><paramref name="stream"/> is <c>null</c>.</para>

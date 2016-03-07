@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -144,8 +144,8 @@ namespace MimeKit.Cryptography {
 		/// <remarks>
 		/// Gets the starting date and time where the certificate is valid.
 		/// </remarks>
-		/// <value>The date and time.</value>
-		public DateTime NotBefore { get { return Certificate.NotBefore; } }
+		/// <value>The date and time in coordinated universal time (UTC).</value>
+		public DateTime NotBefore { get { return Certificate.NotBefore.ToUniversalTime (); } }
 
 		/// <summary>
 		/// Gets the end date and time where the certificate is valid.
@@ -153,8 +153,8 @@ namespace MimeKit.Cryptography {
 		/// <remarks>
 		/// Gets the end date and time where the certificate is valid.
 		/// </remarks>
-		/// <value>The date and time.</value>
-		public DateTime NotAfter { get { return Certificate.NotAfter; } }
+		/// <value>The date and time in coordinated universal time (UTC).</value>
+		public DateTime NotAfter { get { return Certificate.NotAfter.ToUniversalTime (); } }
 
 		/// <summary>
 		/// Gets the certificate issuer's name.

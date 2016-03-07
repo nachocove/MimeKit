@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc.
+// Copyright (c) 2013-2016 Xamarin Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -161,11 +161,6 @@ namespace MimeKit.Encodings {
 
 			if (output.Length < EstimateOutputLength (length))
 				throw new ArgumentException ("The output buffer is not large enough to contain the decoded input.", "output");
-		}
-
-		static byte Decode (int c)
-		{
-			return (byte) ((c - 0x20) & 0x3F);
 		}
 
 		unsafe byte* ScanBeginMarker (byte* inptr, byte* inend)

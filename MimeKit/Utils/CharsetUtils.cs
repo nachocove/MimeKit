@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc.
+// Copyright (c) 2013-2016 Xamarin Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -45,15 +45,30 @@ using Decoder = Portable.Text.Decoder;
 namespace MimeKit.Utils {
 	static class CharsetUtils
 	{
-		// Note: Encoding.UTF8.GetString() replaces invalid bytes with a unicode '?' character,
-		// so we use our own UTF8 instance when using GetString() if we do not want it to do that.
-		public static readonly Encoding Latin1 = Encoding.GetEncoding (28591, new EncoderExceptionFallback (), new DecoderExceptionFallback ());
-		public static readonly Encoding UTF8 = Encoding.GetEncoding (65001, new EncoderExceptionFallback (), new DecoderExceptionFallback ());
-		static readonly Dictionary<string, int> aliases = new Dictionary<string, int> (StringComparer.OrdinalIgnoreCase);
+		static readonly Dictionary<string, int> aliases;
+		public static readonly Encoding Latin1;
+		public static readonly Encoding UTF8;
 
 		static CharsetUtils ()
 		{
 			int gb2312;
+
+			try {
+				Latin1 = Encoding.GetEncoding (28591, new EncoderExceptionFallback (), new DecoderExceptionFallback ());
+			} catch (NotSupportedException) {
+				// Note: Some ASP.NET web hosts such as GoDaddy's Windows environment do not have
+				// iso-8859-1 support, they only have the built-in text encodings, so we need to
+				// hack around it by using an alternative encoding.
+
+				// Try to use Windows-1252 if it is available...
+				Latin1 = Encoding.GetEncoding (1252, new EncoderExceptionFallback (), new DecoderExceptionFallback ());
+			}
+
+			// Note: Encoding.UTF8.GetString() replaces invalid bytes with a unicode '?' character,
+			// so we use our own UTF8 instance when using GetString() if we do not want it to do that.
+			UTF8 = Encoding.GetEncoding (65001, new EncoderExceptionFallback (), new DecoderExceptionFallback ());
+
+			aliases = new Dictionary<string, int> (MimeUtils.OrdinalIgnoreCase);
 
 			AddAliases (aliases, 65001, -1, "utf-8", "utf8");
 
@@ -166,7 +181,7 @@ namespace MimeKit.Utils {
 
 		static int ParseIsoCodePage (string charset)
 		{
-			if (charset.Length < 6)
+			if (charset.Length < 5)
 				return -1;
 
 			int dash = charset.IndexOfAny (new [] { '-', '_' });
@@ -198,14 +213,9 @@ namespace MimeKit.Utils {
 				break;
 			case 2022:
 				switch (suffix.ToLowerInvariant ()) {
-				case "jp":
-					codepage = 50220;
-					break;
-				case "kr":
-					codepage = 50225;
-					break;
-				default:
-					return -1;
+				case "jp": codepage = 50220; break;
+				case "kr": codepage = 50225; break;
+				default: return -1;
 				}
 				break;
 			default:
@@ -215,7 +225,7 @@ namespace MimeKit.Utils {
 			return codepage;
 		}
 
-		static int ParseCodePage (string charset)
+		internal static int ParseCodePage (string charset)
 		{
 			int codepage;
 			int i;
@@ -271,7 +281,7 @@ namespace MimeKit.Utils {
 
 				if (int.TryParse (charset.Substring (i), out codepage))
 					return codepage;
-			} else if (charset == "latin1") {
+			} else if (charset.Equals ("latin1", StringComparison.OrdinalIgnoreCase)) {
 				return 28591;
 			}
 
@@ -330,7 +340,7 @@ namespace MimeKit.Utils {
 				throw new ArgumentNullException ("fallback");
 
 			if ((codepage = GetCodePage (charset)) == -1)
-				throw new NotSupportedException ();
+				throw new NotSupportedException (string.Format ("The '{0}' encoding is not supported.", charset));
 
 			var encoderFallback = new EncoderReplacementFallback (fallback);
 			var decoderFallback = new DecoderReplacementFallback (fallback);
@@ -340,9 +350,9 @@ namespace MimeKit.Utils {
 
 		public static Encoding GetEncoding (string charset)
 		{
-			int codepage = GetCodePage (charset);
+			int codepage;
 
-			if (codepage == -1)
+			if ((codepage = GetCodePage (charset)) == -1)
 				throw new NotSupportedException (string.Format ("The '{0}' encoding is not supported.", charset));
 
 			try {

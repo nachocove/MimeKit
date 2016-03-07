@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -129,6 +129,15 @@ namespace MimeKit {
 			}
 		}
 
+		/// <summary>
+		/// Clone the address.
+		/// </summary>
+		/// <remarks>
+		/// Clones the address.
+		/// </remarks>
+		/// <returns>The cloned address.</returns>
+		public abstract InternetAddress Clone ();
+
 		#region IComparable implementation
 
 		/// <summary>
@@ -227,8 +236,29 @@ namespace MimeKit {
 		/// return a string suitable only for display purposes.</para>
 		/// </remarks>
 		/// <returns>A string representing the <see cref="InternetAddress"/>.</returns>
+		/// <param name="options">The formatting options.</param>
 		/// <param name="encode">If set to <c>true</c>, the <see cref="InternetAddress"/> will be encoded.</param>
-		public abstract string ToString (bool encode);
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="options"/> is <c>null</c>.
+		/// </exception>
+		public abstract string ToString (FormatOptions options, bool encode);
+
+		/// <summary>
+		/// Returns a string representation of the <see cref="InternetAddress"/>,
+		/// optionally encoding it for transport.
+		/// </summary>
+		/// <remarks>
+		/// <para>If the <paramref name="encode"/> parameter is <c>true</c>, then this method will return
+		/// an encoded version of the internet address according to the rules described in rfc2047.</para>
+		/// <para>However, if the <paramref name="encode"/> parameter is <c>false</c>, then this method will
+		/// return a string suitable only for display purposes.</para>
+		/// </remarks>
+		/// <returns>A string representing the <see cref="InternetAddress"/>.</returns>
+		/// <param name="encode">If set to <c>true</c>, the <see cref="InternetAddress"/> will be encoded.</param>
+		public string ToString (bool encode)
+		{
+			return ToString (FormatOptions.Default, encode);
+		}
 
 		/// <summary>
 		/// Returns a string representation of a <see cref="InternetAddress"/> suitable for display.
@@ -239,7 +269,7 @@ namespace MimeKit {
 		/// <returns>A string representing the <see cref="InternetAddress"/>.</returns>
 		public override string ToString ()
 		{
-			return ToString (false);
+			return ToString (FormatOptions.Default, false);
 		}
 
 		internal event EventHandler Changed;
@@ -381,7 +411,8 @@ namespace MimeKit {
 			}
 
 			if (text[index] == (byte) '@') {
-				if (!DomainList.TryParse (text, ref index, endIndex, throwOnError, out route)) {
+				// Note: we always pass 'false' as the throwOnError argument here so that we can throw a more informative exception on error
+				if (!DomainList.TryParse (text, ref index, endIndex, false, out route)) {
 					if (throwOnError)
 						throw new ParseException (string.Format ("Invalid route in mailbox at offset {0}", startIndex), startIndex, index);
 
@@ -464,8 +495,20 @@ namespace MimeKit {
 			return true;
 		}
 
-		internal static bool TryParse (ParserOptions options, byte[] text, ref int index, int endIndex, bool throwOnError, out InternetAddress address)
+		[Flags]
+		internal enum AddressParserFlags {
+			AllowMailboxAddress = 1 << 0,
+			AllowGroupAddress   = 1 << 1,
+			ThrowOnError        = 1 << 2,
+
+			TryParse            = AllowMailboxAddress | AllowGroupAddress,
+			Parse               = TryParse | ThrowOnError
+		}
+
+		internal static bool TryParse (ParserOptions options, byte[] text, ref int index, int endIndex, AddressParserFlags flags, out InternetAddress address)
 		{
+			bool throwOnError = (flags & AddressParserFlags.ThrowOnError) != 0;
+
 			address = null;
 
 			if (!ParseUtils.SkipCommentsAndWhiteSpace (text, ref index, endIndex, throwOnError))
@@ -544,6 +587,13 @@ namespace MimeKit {
 				int codepage = -1;
 				string name;
 
+				if ((flags & AddressParserFlags.AllowGroupAddress) == 0) {
+					if (throwOnError)
+						throw new ParseException (string.Format ("group address token at offset {0}", startIndex), startIndex, index);
+
+					return false;
+				}
+
 				if (length > 0) {
 					name = Rfc2047.DecodePhrase (options, text, startIndex, length, out codepage);
 				} else {
@@ -554,6 +604,13 @@ namespace MimeKit {
 					codepage = 65001;
 
 				return TryParseGroup (options, text, startIndex, ref index, endIndex, MimeUtils.Unquote (name), codepage, throwOnError, out address);
+			}
+
+			if ((flags & AddressParserFlags.AllowMailboxAddress) == 0) {
+				if (throwOnError)
+					throw new ParseException (string.Format ("mailbox address token at offset {0}", startIndex), startIndex, index);
+
+				return false;
 			}
 
 			if (text[index] == (byte) '<') {
@@ -637,22 +694,12 @@ namespace MimeKit {
 		/// </exception>
 		public static bool TryParse (ParserOptions options, byte[] buffer, int startIndex, int length, out InternetAddress address)
 		{
-			if (options == null)
-				throw new ArgumentNullException ("options");
-
-			if (buffer == null)
-				throw new ArgumentNullException ("buffer");
-
-			if (startIndex < 0 || startIndex > buffer.Length)
-				throw new ArgumentOutOfRangeException ("startIndex");
-
-			if (length < 0 || length > (buffer.Length - startIndex))
-				throw new ArgumentOutOfRangeException ("length");
+			ParseUtils.ValidateArguments (options, buffer, startIndex, length);
 
 			int endIndex = startIndex + length;
 			int index = startIndex;
 
-			if (!TryParse (options, buffer, ref index, endIndex, false, out address))
+			if (!TryParse (options, buffer, ref index, endIndex, AddressParserFlags.TryParse, out address))
 				return false;
 
 			if (!ParseUtils.SkipCommentsAndWhiteSpace (buffer, ref index, endIndex, false)) {
@@ -714,27 +761,15 @@ namespace MimeKit {
 		/// </exception>
 		public static bool TryParse (ParserOptions options, byte[] buffer, int startIndex, out InternetAddress address)
 		{
-			if (options == null)
-				throw new ArgumentNullException ("options");
-
-			if (buffer == null)
-				throw new ArgumentNullException ("buffer");
-
-			if (startIndex < 0 || startIndex >= buffer.Length)
-				throw new ArgumentOutOfRangeException ("startIndex");
+			ParseUtils.ValidateArguments (options, buffer, startIndex);
 
 			int endIndex = buffer.Length;
 			int index = startIndex;
 
-			if (!TryParse (options, buffer, ref index, endIndex, false, out address))
+			if (!TryParse (options, buffer, ref index, endIndex, AddressParserFlags.TryParse, out address))
 				return false;
 
-			if (!ParseUtils.SkipCommentsAndWhiteSpace (buffer, ref index, endIndex, false)) {
-				address = null;
-				return false;
-			}
-
-			if (index != endIndex) {
+			if (!ParseUtils.SkipCommentsAndWhiteSpace (buffer, ref index, endIndex, false) || index != endIndex) {
 				address = null;
 				return false;
 			}
@@ -782,24 +817,15 @@ namespace MimeKit {
 		/// </exception>
 		public static bool TryParse (ParserOptions options, byte[] buffer, out InternetAddress address)
 		{
-			if (options == null)
-				throw new ArgumentNullException ("options");
-
-			if (buffer == null)
-				throw new ArgumentNullException ("buffer");
+			ParseUtils.ValidateArguments (options, buffer);
 
 			int endIndex = buffer.Length;
 			int index = 0;
 
-			if (!TryParse (options, buffer, ref index, endIndex, false, out address))
+			if (!TryParse (options, buffer, ref index, endIndex, AddressParserFlags.TryParse, out address))
 				return false;
 
-			if (!ParseUtils.SkipCommentsAndWhiteSpace (buffer, ref index, endIndex, false)) {
-				address = null;
-				return false;
-			}
-
-			if (index != endIndex) {
+			if (!ParseUtils.SkipCommentsAndWhiteSpace (buffer, ref index, endIndex, false) || index != endIndex) {
 				address = null;
 				return false;
 			}
@@ -841,25 +867,16 @@ namespace MimeKit {
 		/// </exception>
 		public static bool TryParse (ParserOptions options, string text, out InternetAddress address)
 		{
-			if (options == null)
-				throw new ArgumentNullException ("options");
-
-			if (text == null)
-				throw new ArgumentNullException ("text");
+			ParseUtils.ValidateArguments (options, text);
 
 			var buffer = Encoding.UTF8.GetBytes (text);
 			int endIndex = buffer.Length;
 			int index = 0;
 
-			if (!TryParse (options, buffer, ref index, endIndex, false, out address))
+			if (!TryParse (options, buffer, ref index, endIndex, AddressParserFlags.TryParse, out address))
 				return false;
 
-			if (!ParseUtils.SkipCommentsAndWhiteSpace (buffer, ref index, endIndex, false)) {
-				address = null;
-				return false;
-			}
-
-			if (index != endIndex) {
+			if (!ParseUtils.SkipCommentsAndWhiteSpace (buffer, ref index, endIndex, false) || index != endIndex) {
 				address = null;
 				return false;
 			}
@@ -911,23 +928,14 @@ namespace MimeKit {
 		/// </exception>
 		public static InternetAddress Parse (ParserOptions options, byte[] buffer, int startIndex, int length)
 		{
-			if (options == null)
-				throw new ArgumentNullException ("options");
-
-			if (buffer == null)
-				throw new ArgumentNullException ("buffer");
-
-			if (startIndex < 0 || startIndex > buffer.Length)
-				throw new ArgumentOutOfRangeException ("startIndex");
-
-			if (length < 0 || length > (buffer.Length - startIndex))
-				throw new ArgumentOutOfRangeException ("length");
+			ParseUtils.ValidateArguments (options, buffer, startIndex, length);
 
 			int endIndex = startIndex + length;
 			InternetAddress address;
 			int index = startIndex;
 
-			TryParse (options, buffer, ref index, endIndex, true, out address);
+			if (!TryParse (options, buffer, ref index, endIndex, AddressParserFlags.Parse, out address))
+				throw new ParseException ("No address found.", startIndex, startIndex);
 
 			ParseUtils.SkipCommentsAndWhiteSpace (buffer, ref index, endIndex, true);
 
@@ -987,20 +995,14 @@ namespace MimeKit {
 		/// </exception>
 		public static InternetAddress Parse (ParserOptions options, byte[] buffer, int startIndex)
 		{
-			if (options == null)
-				throw new ArgumentNullException ("options");
-
-			if (buffer == null)
-				throw new ArgumentNullException ("buffer");
-
-			if (startIndex < 0 || startIndex > buffer.Length)
-				throw new ArgumentOutOfRangeException ("startIndex");
+			ParseUtils.ValidateArguments (options, buffer, startIndex);
 
 			int endIndex = buffer.Length;
 			InternetAddress address;
 			int index = startIndex;
 
-			TryParse (options, buffer, ref index, endIndex, true, out address);
+			if (!TryParse (options, buffer, ref index, endIndex, AddressParserFlags.Parse, out address))
+				throw new ParseException ("No address found.", startIndex, startIndex);
 
 			ParseUtils.SkipCommentsAndWhiteSpace (buffer, ref index, endIndex, true);
 
@@ -1054,17 +1056,14 @@ namespace MimeKit {
 		/// </exception>
 		public static InternetAddress Parse (ParserOptions options, byte[] buffer)
 		{
-			if (options == null)
-				throw new ArgumentNullException ("options");
-
-			if (buffer == null)
-				throw new ArgumentNullException ("buffer");
+			ParseUtils.ValidateArguments (options, buffer);
 
 			int endIndex = buffer.Length;
 			InternetAddress address;
 			int index = 0;
 
-			TryParse (options, buffer, ref index, endIndex, true, out address);
+			if (!TryParse (options, buffer, ref index, endIndex, AddressParserFlags.Parse, out address))
+				throw new ParseException ("No address found.", 0, 0);
 
 			ParseUtils.SkipCommentsAndWhiteSpace (buffer, ref index, endIndex, true);
 
@@ -1114,18 +1113,15 @@ namespace MimeKit {
 		/// </exception>
 		public static InternetAddress Parse (ParserOptions options, string text)
 		{
-			if (options == null)
-				throw new ArgumentNullException ("options");
-
-			if (text == null)
-				throw new ArgumentNullException ("text");
+			ParseUtils.ValidateArguments (options, text);
 
 			var buffer = Encoding.UTF8.GetBytes (text);
 			int endIndex = buffer.Length;
 			InternetAddress address;
 			int index = 0;
 
-			TryParse (options, buffer, ref index, endIndex, true, out address);
+			if (!TryParse (options, buffer, ref index, endIndex, AddressParserFlags.Parse, out address))
+				throw new ParseException ("No address found.", 0, 0);
 
 			ParseUtils.SkipCommentsAndWhiteSpace (buffer, ref index, endIndex, true);
 

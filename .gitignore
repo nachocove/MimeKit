@@ -1,9 +1,12 @@
 Mono.Data.Sqlite/Documentation
-*~
+*project.lock.json
 *.userprefs
+*.user
 *.suo
 .DS_Store
+*~
 test-results
 packages
 obj
 bin
+.vs

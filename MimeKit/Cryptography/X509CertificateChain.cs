@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -60,6 +60,9 @@ namespace MimeKit.Cryptography {
 		/// Creates a new X.509 certificate chain based on the specified collection of certificates.
 		/// </remarks>
 		/// <param name="collection">A collection of certificates.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="collection"/> is <c>null</c>.
+		/// </exception>
 		public X509CertificateChain (IEnumerable<X509Certificate> collection)
 		{
 			certificates = new List<X509Certificate> (collection);

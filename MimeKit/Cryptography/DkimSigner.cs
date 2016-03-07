@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -78,6 +78,7 @@ namespace MimeKit.Cryptography {
 			Domain = domain;
 		}
 
+#if !PORTABLE
 		/// <summary>
 		/// Initializes a new instance of the <see cref="MimeKit.Cryptography.DkimSigner"/> class.
 		/// </summary>
@@ -128,22 +129,36 @@ namespace MimeKit.Cryptography {
 			if (selector == null)
 				throw new ArgumentNullException ("selector");
 
-			AsymmetricCipherKeyPair key;
+			AsymmetricKeyParameter key = null;
 
-			using (var stream = new StreamReader (fileName)) {
-				var reader = new PemReader (stream);
+			using (var stream = File.OpenRead (fileName)) {
+				using (var reader = new StreamReader (stream)) {
+					var pem = new PemReader (reader);
 
-				key = reader.ReadObject () as AsymmetricCipherKeyPair;
+					var keyObject = pem.ReadObject ();
+
+					if (keyObject != null) {
+						key = keyObject as AsymmetricKeyParameter;
+
+						if (key == null) {
+							var pair = keyObject as AsymmetricCipherKeyPair;
+
+							if (pair != null)
+								key = pair.Private;
+						}
+					}
+				}
 			}
 
-			if (key == null)
+			if (key == null || !key.IsPrivate)
 				throw new FormatException ("Private key not found.");
 
 			SignatureAlgorithm = DkimSignatureAlgorithm.RsaSha256;
-			PrivateKey = key.Private;
+			PrivateKey = key;
 			Selector = selector;
 			Domain = domain;
 		}
+#endif
 
 		/// <summary>
 		/// Gets the private key.

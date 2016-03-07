@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc.
+// Copyright (c) 2013-2016 Xamarin Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -148,7 +148,7 @@ namespace MimeKit {
 		/// <value>The parameters.</value>
 		public ParameterList Parameters {
 			get { return parameters; }
-			private set {
+			internal set {
 				if (parameters != null)
 					parameters.Changed -= OnParametersChanged;
 
@@ -259,7 +259,30 @@ namespace MimeKit {
 		/// <para>-or-</para>
 		/// <para><paramref name="mediaSubtype"/> is <c>null</c>.</para>
 		/// </exception>
+		[Obsolete ("Use IsMimeType (string mediaType, string mediaSubtype) instead.")]
 		public bool Matches (string mediaType, string mediaSubtype)
+		{
+			return IsMimeType (mediaType, mediaSubtype);
+		}
+
+		/// <summary>
+		/// Checks if the this instance of <see cref="MimeKit.ContentType"/> matches
+		/// the specified MIME media type and subtype.
+		/// </summary>
+		/// <remarks>
+		/// If the specified <paramref name="mediaType"/> or <paramref name="mediaSubtype"/>
+		/// are <c>"*"</c>, they match anything.
+		/// </remarks>
+		/// <returns><c>true</c> if the <see cref="ContentType"/> matches the
+		/// provided media type and subtype.</returns>
+		/// <param name="mediaType">The media type.</param>
+		/// <param name="mediaSubtype">The media subtype.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <para><paramref name="mediaType"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="mediaSubtype"/> is <c>null</c>.</para>
+		/// </exception>
+		public bool IsMimeType (string mediaType, string mediaSubtype)
 		{
 			if (mediaType == null)
 				throw new ArgumentNullException ("mediaType");
@@ -275,15 +298,58 @@ namespace MimeKit {
 
 		internal string Encode (FormatOptions options, Encoding charset)
 		{
-			int lineLength = "Content-Type: ".Length;
+			int lineLength = "Content-Type:".Length;
 			var value = new StringBuilder (" ");
 
 			value.Append (MediaType);
 			value.Append ('/');
 			value.Append (MediaSubtype);
 
+			lineLength += value.Length;
+
 			Parameters.Encode (options, value, ref lineLength, charset);
 			value.Append (options.NewLine);
+
+			return value.ToString ();
+		}
+
+		/// <summary>
+		/// Serializes the <see cref="ContentType"/> to a string,
+		/// optionally encoding the parameters.
+		/// </summary>
+		/// <remarks>
+		/// Creates a string-representation of the <see cref="ContentType"/>, optionally encoding
+		/// the parameters as they would be encoded for transport.
+		/// </remarks>
+		/// <returns>The serialized string.</returns>
+		/// <param name="options">The formatting options.</param>
+		/// <param name="charset">The charset to be used when encoding the parameter values.</param>
+		/// <param name="encode">If set to <c>true</c>, the parameter values will be encoded.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <para><paramref name="options"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="charset"/> is <c>null</c>.</para>
+		/// </exception>
+		public string ToString (FormatOptions options, Encoding charset, bool encode)
+		{
+			if (options == null)
+				throw new ArgumentNullException ("options");
+
+			if (charset == null)
+				throw new ArgumentNullException ("charset");
+
+			var value = new StringBuilder ("Content-Type: ");
+			value.Append (MediaType);
+			value.Append ('/');
+			value.Append (MediaSubtype);
+
+			if (encode) {
+				int lineLength = value.Length;
+
+				Parameters.Encode (options, value, ref lineLength, charset);
+			} else {
+				value.Append (Parameters.ToString ());
+			}
 
 			return value.ToString ();
 		}
@@ -304,23 +370,7 @@ namespace MimeKit {
 		/// </exception>
 		public string ToString (Encoding charset, bool encode)
 		{
-			if (charset == null)
-				throw new ArgumentNullException ("charset");
-
-			var value = new StringBuilder ("Content-Type: ");
-			value.Append (MediaType);
-			value.Append ('/');
-			value.Append (MediaSubtype);
-
-			if (encode) {
-				int lineLength = value.Length;
-
-				Parameters.Encode (FormatOptions.Default, value, ref lineLength, charset);
-			} else {
-				value.Append (Parameters.ToString ());
-			}
-
-			return value.ToString ();
+			return ToString (FormatOptions.Default, charset, encode);
 		}
 
 		/// <summary>
@@ -334,7 +384,7 @@ namespace MimeKit {
 		/// <see cref="MimeKit.ContentType"/>.</returns>
 		public override string ToString ()
 		{
-			return ToString (Encoding.UTF8, false);
+			return ToString (FormatOptions.Default, Encoding.UTF8, false);
 		}
 
 		internal event EventHandler Changed;
@@ -462,17 +512,7 @@ namespace MimeKit {
 		/// </exception>
 		public static bool TryParse (ParserOptions options, byte[] buffer, int startIndex, int length, out ContentType type)
 		{
-			if (options == null)
-				throw new ArgumentNullException ("options");
-
-			if (buffer == null)
-				throw new ArgumentNullException ("buffer");
-
-			if (startIndex < 0 || startIndex > buffer.Length)
-				throw new ArgumentOutOfRangeException ("startIndex");
-
-			if (length < 0 || length > (buffer.Length - startIndex))
-				throw new ArgumentOutOfRangeException ("length");
+			ParseUtils.ValidateArguments (options, buffer, startIndex, length);
 
 			int index = startIndex;
 
@@ -524,14 +564,7 @@ namespace MimeKit {
 		/// </exception>
 		public static bool TryParse (ParserOptions options, byte[] buffer, int startIndex, out ContentType type)
 		{
-			if (options == null)
-				throw new ArgumentNullException ("options");
-
-			if (buffer == null)
-				throw new ArgumentNullException ("buffer");
-
-			if (startIndex < 0 || startIndex >= buffer.Length)
-				throw new ArgumentOutOfRangeException ("startIndex");
+			ParseUtils.ValidateArguments (options, buffer, startIndex);
 
 			int index = startIndex;
 
@@ -576,11 +609,7 @@ namespace MimeKit {
 		/// </exception>
 		public static bool TryParse (ParserOptions options, byte[] buffer, out ContentType type)
 		{
-			if (options == null)
-				throw new ArgumentNullException ("options");
-
-			if (buffer == null)
-				throw new ArgumentNullException ("buffer");
+			ParseUtils.ValidateArguments (options, buffer);
 
 			int index = 0;
 
@@ -611,6 +640,31 @@ namespace MimeKit {
 		/// Parses a Content-Type value from the specified text.
 		/// </remarks>
 		/// <returns><c>true</c>, if the content type was successfully parsed, <c>false</c> otherwise.</returns>
+		/// <param name="options">THe parser options.</param>
+		/// <param name="text">The text to parse.</param>
+		/// <param name="type">The parsed content type.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <para><paramref name="options"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="text"/> is <c>null</c>.</para>
+		/// </exception>
+		public static bool TryParse (ParserOptions options, string text, out ContentType type)
+		{
+			ParseUtils.ValidateArguments (options, text);
+
+			var buffer = Encoding.UTF8.GetBytes (text);
+			int index = 0;
+
+			return TryParse (options, buffer, ref index, buffer.Length, false, out type);
+		}
+
+		/// <summary>
+		/// Tries to parse the given text into a new <see cref="MimeKit.ContentType"/> instance.
+		/// </summary>
+		/// <remarks>
+		/// Parses a Content-Type value from the specified text.
+		/// </remarks>
+		/// <returns><c>true</c>, if the content type was successfully parsed, <c>false</c> otherwise.</returns>
 		/// <param name="text">The text to parse.</param>
 		/// <param name="type">The parsed content type.</param>
 		/// <exception cref="System.ArgumentNullException">
@@ -618,13 +672,7 @@ namespace MimeKit {
 		/// </exception>
 		public static bool TryParse (string text, out ContentType type)
 		{
-			if (text == null)
-				throw new ArgumentNullException ("text");
-
-			var buffer = Encoding.UTF8.GetBytes (text);
-			int index = 0;
-
-			return TryParse (ParserOptions.Default, buffer, ref index, buffer.Length, false, out type);
+			return TryParse (ParserOptions.Default, text, out type);
 		}
 
 		/// <summary>
@@ -653,17 +701,7 @@ namespace MimeKit {
 		/// </exception>
 		public static ContentType Parse (ParserOptions options, byte[] buffer, int startIndex, int length)
 		{
-			if (options == null)
-				throw new ArgumentNullException ("options");
-
-			if (buffer == null)
-				throw new ArgumentNullException ("buffer");
-
-			if (startIndex < 0 || startIndex > buffer.Length)
-				throw new ArgumentOutOfRangeException ("startIndex");
-
-			if (length < 0 || length > (buffer.Length - startIndex))
-				throw new ArgumentOutOfRangeException ("length");
+			ParseUtils.ValidateArguments (options, buffer, startIndex, length);
 
 			int index = startIndex;
 			ContentType type;
@@ -722,14 +760,7 @@ namespace MimeKit {
 		/// </exception>
 		public static ContentType Parse (ParserOptions options, byte[] buffer, int startIndex)
 		{
-			if (options == null)
-				throw new ArgumentNullException ("options");
-
-			if (buffer == null)
-				throw new ArgumentNullException ("buffer");
-
-			if (startIndex < 0 || startIndex > buffer.Length)
-				throw new ArgumentOutOfRangeException ("startIndex");
+			ParseUtils.ValidateArguments (options, buffer, startIndex);
 
 			int index = startIndex;
 			ContentType type;
@@ -781,11 +812,7 @@ namespace MimeKit {
 		/// </exception>
 		public static ContentType Parse (ParserOptions options, byte[] buffer)
 		{
-			if (options == null)
-				throw new ArgumentNullException ("options");
-
-			if (buffer == null)
-				throw new ArgumentNullException ("buffer");
+			ParseUtils.ValidateArguments (options, buffer);
 
 			ContentType type;
 			int index = 0;
@@ -833,11 +860,7 @@ namespace MimeKit {
 		/// </exception>
 		public static ContentType Parse (ParserOptions options, string text)
 		{
-			if (options == null)
-				throw new ArgumentNullException ("options");
-
-			if (text == null)
-				throw new ArgumentNullException ("text");
+			ParseUtils.ValidateArguments (options, text);
 
 			var buffer = Encoding.UTF8.GetBytes (text);
 			ContentType type;

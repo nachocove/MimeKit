@@ -28,7 +28,7 @@ which is implemented in C and later added a C# binding called GMime-Sharp.
 
 Now that I typically find myself working in C# rather than lower level languages like C, I decided to
 begin writing a new parser in C# which would not depend on GMime. This would also allow me to have more
-flexibility in that I'd be able use Generics and create a more .NET-compliant API.
+flexibility in that I'd be able to use Generics and create a more .NET-compliant API.
 
 ## Performance
 
@@ -73,7 +73,7 @@ How does your MIME parser compare?
 
 ## License Information
 
-MimeKit is Copyright (C) 2012-2015 Xamarin Inc. and is licensed under the MIT license:
+MimeKit is Copyright (C) 2012-2016 Xamarin Inc. and is licensed under the MIT license:
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the "Software"), to deal
@@ -472,7 +472,7 @@ Before you can begin using MimeKit's S/MIME support, you will need to decide whi
 database to use for certificate storage.
 
 If you are targetting any of the Xamarin platforms (or Linux), you won't need to do
-anything (although you certianly can if you want to) because, by default, I've
+anything (although you certainly can if you want to) because, by default, I've
 configured MimeKit to use the Mono.Data.Sqlite binding to SQLite.
 
 If you are, however, on any of the Windows platforms, you'll need to pick a System.Data
@@ -626,7 +626,7 @@ using (var ctx = new MyGnuPGContext ()) {
 
 As mentioned earlier, PGP/MIME uses a multipart/encrypted part to encapsulate the encrypted content.
 
-A multipart/encrtpted contains exactly 2 parts: the first `MimeEntity` is the version information while the
+A multipart/encrypted contains exactly 2 parts: the first `MimeEntity` is the version information while the
 second `MimeEntity` is the actual encrypted content and will typically be an application/octet-stream.
 
 The first thing you must do is find the `MultipartEncrypted` part (see the section on traversing MIME parts).
@@ -793,6 +793,9 @@ tracker and look for something that might pique your interest!
 MimeKit is a personal open source project that I have put thousands of hours into perfecting with the
 goal of making it not only the very best MIME parser framework for .NET, but the best MIME parser
 framework for any programming language. I need your help to achieve this.
+
+Donating helps pay for things such as web hosting and licenses for developer tools such as a
+performance profiler, memory profiler, a static code analysis tool, and more.
 
 <a href="http://www.pledgie.com/campaigns/29300" target="_blank">
   <img src="http://www.pledgie.com/campaigns/29300.png?skin_name=chrome"

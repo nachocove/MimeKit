@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -69,6 +69,7 @@ namespace MimeKit.Tnef {
 			get; set;
 		}
 
+#if false
 		/// <summary>
 		/// Gets a value indicating whether the current property is a computed property.
 		/// </summary>
@@ -79,6 +80,7 @@ namespace MimeKit.Tnef {
 		public bool IsComputedProperty {
 			get { throw new NotImplementedException (); }
 		}
+#endif
 
 		/// <summary>
 		/// Gets a value indicating whether the current property is an embedded TNEF message.
@@ -91,6 +93,7 @@ namespace MimeKit.Tnef {
 			get { return propertyTag.Id == TnefPropertyId.AttachData && AttachMethod == TnefAttachMethod.EmbeddedMessage; }
 		}
 
+#if false
 		/// <summary>
 		/// Gets a value indicating whether the current property has a large value.
 		/// </summary>
@@ -101,6 +104,7 @@ namespace MimeKit.Tnef {
 		public bool IsLargeValue {
 			get { throw new NotImplementedException (); }
 		}
+#endif
 
 		/// <summary>
 		/// Gets a value indicating whether or not the current property has multiple values.
@@ -135,6 +139,7 @@ namespace MimeKit.Tnef {
 			get { return propertyTag.ValueTnefType == TnefPropertyType.Object; }
 		}
 
+#if false
 		/// <summary>
 		/// Gets the object iid.
 		/// </summary>
@@ -145,6 +150,7 @@ namespace MimeKit.Tnef {
 		public Guid ObjectIid {
 			get { throw new NotImplementedException (); }
 		}
+#endif
 
 		/// <summary>
 		/// Gets the number of properties available.
@@ -620,7 +626,7 @@ namespace MimeKit.Tnef {
 				return false;
 			}
 
-			return CheckRawValueLength ();
+			return true;
 		}
 
 		/// <summary>

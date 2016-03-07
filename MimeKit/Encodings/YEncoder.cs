@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -35,11 +35,11 @@ namespace MimeKit.Encodings {
 	/// <remarks>
 	/// <para>The yEncoding is an encoding that is most commonly used with Usenet and
 	/// is a binary encoding that includes a 32-bit cyclic redundancy check.</para>
-	/// <para>For more information, see http://www.yenc.org/</para>
+	/// <para>For more information, see <a href="http://www.yenc.org">www.yenc.org</a>.</para>
 	/// </remarks>
 	public class YEncoder : IMimeEncoder
 	{
-		int lineLength;
+		readonly int lineLength;
 		byte octets;
 		Crc32 crc;
 
@@ -80,9 +80,8 @@ namespace MimeKit.Encodings {
 		/// <returns>A new <see cref="YEncoder"/> with identical state.</returns>
 		public IMimeEncoder Clone ()
 		{
-			var encoder = new YEncoder ();
+			var encoder = new YEncoder (lineLength);
 
-			encoder.lineLength = lineLength;
 			encoder.crc = crc.Clone ();
 			encoder.octets = octets;
 

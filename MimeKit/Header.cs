@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc.
+// Copyright (c) 2013-2016 Xamarin Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -114,9 +114,6 @@ namespace MimeKit {
 		/// <exception cref="System.ArgumentOutOfRangeException">
 		/// <paramref name="id"/> is not a valid <see cref="HeaderId"/>.
 		/// </exception>
-		/// <exception cref="System.ArgumentException">
-		/// <paramref name="charset"/> cannot be empty.
-		/// </exception>
 		/// <exception cref="System.NotSupportedException">
 		/// <paramref name="charset"/> is not supported.
 		/// </exception>
@@ -124,9 +121,6 @@ namespace MimeKit {
 		{
 			if (charset == null)
 				throw new ArgumentNullException ("charset");
-
-			if (charset.Length == 0)
-				throw new ArgumentException ("The charset name cannot be empty.", "charset");
 
 			if (id == HeaderId.Unknown)
 				throw new ArgumentOutOfRangeException ("id");
@@ -231,9 +225,7 @@ namespace MimeKit {
 		/// <para><paramref name="value"/> is <c>null</c>.</para>
 		/// </exception>
 		/// <exception cref="System.ArgumentException">
-		/// <para><paramref name="charset"/> cannot be empty.</para>
-		/// <para>-or-</para>
-		/// <para>The <paramref name="field"/> contains illegal characters.</para>
+		/// The <paramref name="field"/> contains illegal characters.
 		/// </exception>
 		/// <exception cref="System.NotSupportedException">
 		/// <paramref name="charset"/> is not supported.
@@ -242,9 +234,6 @@ namespace MimeKit {
 		{
 			if (charset == null)
 				throw new ArgumentNullException ("charset");
-
-			if (charset.Length == 0)
-				throw new ArgumentException ("The charset name cannot be empty.", "charset");
 
 			if (field == null)
 				throw new ArgumentNullException ("field");
@@ -871,7 +860,7 @@ namespace MimeKit {
 			lineLength = Math.Max (lineLength, 1);
 
 			while (startIndex < word.Length) {
-				int length = Math.Min (format.MaxLineLength - lineLength, word.Length);
+				int length = Math.Min (format.MaxLineLength - lineLength, word.Length - startIndex);
 
 				if (char.IsSurrogatePair (word, startIndex + length - 1))
 					length--;
@@ -1299,17 +1288,7 @@ namespace MimeKit {
 		/// </exception>
 		public static bool TryParse (ParserOptions options, byte[] buffer, int startIndex, int length, out Header header)
 		{
-			if (options == null)
-				throw new ArgumentNullException ("options");
-
-			if (buffer == null)
-				throw new ArgumentNullException ("buffer");
-
-			if (startIndex < 0 || startIndex > buffer.Length)
-				throw new ArgumentOutOfRangeException ("startIndex");
-
-			if (length < 0 || length > (buffer.Length - startIndex))
-				throw new ArgumentOutOfRangeException ("length");
+			ParseUtils.ValidateArguments (options, buffer, startIndex, length);
 
 			unsafe {
 				fixed (byte* inptr = buffer) {
@@ -1363,9 +1342,15 @@ namespace MimeKit {
 		/// </exception>
 		public static bool TryParse (ParserOptions options, byte[] buffer, int startIndex, out Header header)
 		{
+			ParseUtils.ValidateArguments (options, buffer, startIndex);
+
 			int length = buffer.Length - startIndex;
 
-			return TryParse (options, buffer, startIndex, length, out header);
+			unsafe {
+				fixed (byte* inptr = buffer) {
+					return TryParse (options.Clone (), inptr + startIndex, length, true, out header);
+				}
+			}
 		}
 
 		/// <summary>
@@ -1386,9 +1371,7 @@ namespace MimeKit {
 		/// </exception>
 		public static bool TryParse (byte[] buffer, int startIndex, out Header header)
 		{
-			int length = buffer.Length - startIndex;
-
-			return TryParse (ParserOptions.Default, buffer, startIndex, length, out header);
+			return TryParse (ParserOptions.Default, buffer, startIndex, out header);
 		}
 
 		/// <summary>
@@ -1408,7 +1391,13 @@ namespace MimeKit {
 		/// </exception>
 		public static bool TryParse (ParserOptions options, byte[] buffer, out Header header)
 		{
-			return TryParse (options, buffer, 0, buffer.Length, out header);
+			ParseUtils.ValidateArguments (options, buffer);
+
+			unsafe {
+				fixed (byte* inptr = buffer) {
+					return TryParse (options.Clone (), inptr, buffer.Length, true, out header);
+				}
+			}
 		}
 
 		/// <summary>
@@ -1425,7 +1414,7 @@ namespace MimeKit {
 		/// </exception>
 		public static bool TryParse (byte[] buffer, out Header header)
 		{
-			return TryParse (ParserOptions.Default, buffer, 0, buffer.Length, out header);
+			return TryParse (ParserOptions.Default, buffer, out header);
 		}
 
 		/// <summary>
@@ -1445,11 +1434,7 @@ namespace MimeKit {
 		/// </exception>
 		public static bool TryParse (ParserOptions options, string text, out Header header)
 		{
-			if (options == null)
-				throw new ArgumentNullException ("options");
-
-			if (text == null)
-				throw new ArgumentNullException ("text");
+			ParseUtils.ValidateArguments (options, text);
 
 			var buffer = Encoding.UTF8.GetBytes (text);
 

@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2014 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -43,6 +43,33 @@ namespace UnitTests {
 		static string GetTestDataPath (string relative)
 		{
 			return Path.Combine ("..", "..", "TestData", "smime", relative);
+		}
+
+		[Test]
+		public void TestArgumentExceptions ()
+		{
+			var store = new X509CertificateStore ();
+
+			Assert.Throws<ArgumentNullException> (() => store.Add (null));
+			Assert.Throws<ArgumentNullException> (() => store.AddRange (null));
+			Assert.Throws<ArgumentNullException> (() => store.Export ((Stream) null, "password"));
+			Assert.Throws<ArgumentNullException> (() => store.Export ((string) null, "password"));
+			Assert.Throws<ArgumentNullException> (() => store.Export (Stream.Null, null));
+			Assert.Throws<ArgumentNullException> (() => store.Export ("fileName", null));
+			Assert.Throws<ArgumentNullException> (() => store.Export ((Stream) null));
+			Assert.Throws<ArgumentNullException> (() => store.Export ((string) null));
+			Assert.Throws<ArgumentNullException> (() => store.GetPrivateKey (null));
+			Assert.Throws<ArgumentNullException> (() => store.Import ((Stream) null, "password"));
+			Assert.Throws<ArgumentNullException> (() => store.Import ((string) null, "password"));
+			Assert.Throws<ArgumentNullException> (() => store.Import ((byte[]) null, "password"));
+			Assert.Throws<ArgumentNullException> (() => store.Import (Stream.Null, null));
+			Assert.Throws<ArgumentNullException> (() => store.Import (GetTestDataPath ("smime.p12"), null));
+			Assert.Throws<ArgumentNullException> (() => store.Import (new byte[0], null));
+			Assert.Throws<ArgumentNullException> (() => store.Import ((Stream) null));
+			Assert.Throws<ArgumentNullException> (() => store.Import ((string) null));
+			Assert.Throws<ArgumentNullException> (() => store.Import ((byte[]) null));
+			Assert.Throws<ArgumentNullException> (() => store.Remove (null));
+			Assert.Throws<ArgumentNullException> (() => store.RemoveRange (null));
 		}
 
 		[Test]

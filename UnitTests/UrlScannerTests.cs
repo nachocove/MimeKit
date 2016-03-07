@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -34,8 +34,7 @@ namespace UnitTests {
 	{
 		UrlScanner scanner;
 
-		[TestFixtureSetUp]
-		public void Setup ()
+		public UrlScannerTests ()
 		{
 			scanner = new UrlScanner ();
 
@@ -95,9 +94,57 @@ namespace UnitTests {
 		}
 
 		[Test]
+		public void TestIPv4Addrspec ()
+		{
+			TestUrlScanner ("This is some text with a ipv4@[127.0.0.1] in the text...", "ipv4@[127.0.0.1]");
+		}
+
+		[Test]
+		public void TestIPv6LoopbackAddrspec ()
+		{
+			TestUrlScanner ("This is some text with a ipv6@[IPv6:::1] in the text...", "ipv6@[IPv6:::1]");
+		}
+
+		[Test]
+		public void TestIPv6v4Addrspec ()
+		{
+			TestUrlScanner ("This is some text with a ipv6@[IPv6:::ffff:10.0.0.1] in the text...", "ipv6@[IPv6:::ffff:10.0.0.1]");
+		}
+
+		[Test]
+		public void TestIPv6Addrspec ()
+		{
+			TestUrlScanner ("This is some text with a ipv6@[IPv6:FE80:0000:0000:0000:0202:B3FF:FE1E:8329] in the text...", "ipv6@[IPv6:FE80:0000:0000:0000:0202:B3FF:FE1E:8329]");
+		}
+
+		[Test]
 		public void TestSimpleMailToUrl ()
 		{
 			TestUrlScanner ("This is some text with a mailto:simple.addrspec@example.com in the text...", "mailto:simple.addrspec@example.com");
+		}
+
+		[Test]
+		public void TestMailToWithSimpleQuotedLocalpartAddrspec ()
+		{
+			TestUrlScanner ("This is some text with a mailto:\"quoted local part\"@example.com in the text...", "mailto:\"quoted local part\"@example.com");
+		}
+
+		[Test]
+		public void TestMailToWithComplexQuotedLocalpartAddrspec ()
+		{
+			TestUrlScanner ("This is some text with a mailto:\"quoted \\\"local\\\" part\"@example.com in the text...", "mailto:\"quoted \\\"local\\\" part\"@example.com");
+		}
+
+		[Test]
+		public void TestMailToIPv4Addrspec ()
+		{
+			TestUrlScanner ("This is some text with a mailto:ipv4@[127.0.0.1] in the text...", "mailto:ipv4@[127.0.0.1]");
+		}
+
+		[Test]
+		public void TestMailToIPv6Addrspec ()
+		{
+			TestUrlScanner ("This is some text with a mailto:ipv6@[IPv6:::1] in the text...", "mailto:ipv6@[IPv6:::1]");
 		}
 
 		[Test]

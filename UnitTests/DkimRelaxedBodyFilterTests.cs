@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -44,8 +44,25 @@ namespace UnitTests {
 		[Test]
 		public void TestWhiteSpaceBeforeNewLine ()
 		{
-			const string text = "This is a test of the relaxed body filter   \n   \n";
-			const string expected = "This is a test of the relaxed body filter\n\n";
+			const string text = "text\t \r\n\t \r\ntext\t \r\n";
+			const string expected = "text\r\n\r\ntext\r\n";
+			var input = Encoding.ASCII.GetBytes (text);
+			var filter = new DkimRelaxedBodyFilter ();
+			int outputIndex, outputLength;
+			byte[] output;
+			string actual;
+
+			output = filter.Flush (input, 0, input.Length, out outputIndex, out outputLength);
+			actual = Encoding.ASCII.GetString (output, outputIndex, outputLength);
+
+			Assert.AreEqual (expected, actual);
+		}
+
+		[Test]
+		public void TestTrimmingEmptyLines ()
+		{
+			const string text = "Hello!\r\n  \r\n\r\n";
+			const string expected = "Hello!\r\n";
 			var input = Encoding.ASCII.GetBytes (text);
 			var filter = new DkimRelaxedBodyFilter ();
 			int outputIndex, outputLength;

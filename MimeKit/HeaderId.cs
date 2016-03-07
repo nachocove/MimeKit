@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -29,6 +29,8 @@ using System.Linq;
 using System.Text;
 using System.Reflection;
 using System.Collections.Generic;
+
+using MimeKit.Utils;
 
 namespace MimeKit {
 	/// <summary>
@@ -455,7 +457,7 @@ namespace MimeKit {
 		{
 			var values = (HeaderId[]) Enum.GetValues (typeof (HeaderId));
 
-			dict = new Dictionary<string, HeaderId> (values.Length - 1, StringComparer.OrdinalIgnoreCase);
+			dict = new Dictionary<string, HeaderId> (values.Length - 1, MimeUtils.OrdinalIgnoreCase);
 
 			for (int i = 0; i < values.Length - 1; i++)
 				dict.Add (values[i].ToHeaderName (), values[i]);

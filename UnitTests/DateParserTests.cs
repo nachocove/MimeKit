@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2014 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -35,6 +35,7 @@ namespace UnitTests {
 	public class DateParserTests
 	{
 		static readonly string[] dates = {
+			"Sun, 08 Dec 91 09:11:00 +0000",
 			"8 Dec 1991 09:11 (Sunday)",
 			"26 Dec 1991 20:45 (Thursday)",
 			"Tue, 9 Jun 92 03:45:24 JST",
@@ -48,10 +49,14 @@ namespace UnitTests {
 			"FRI, 30 NOV 2012 02:09:10 +0100",
 			"Tue, 11 Feb 2014 22:27:10 +0100 (CET)",
 			"Wed, 6 Aug 2014 01:53:48 -2200",
-			"Tue, 21 Apr 15 14:44:51 GMT"
+			"Tue, 21 Apr 15 14:44:51 GMT",
+			"Tue, 21 April 15 14:44:51 GMT",
+			"Thu, 1 Oct 2015 14:40:57 +0200 (Mitteleuropäische Sommerzeit)",
+			"Tue, 12 Jun 2012 19:22:28 0200"
 		};
 
 		static readonly string[] expected = {
+			"Sun, 08 Dec 1991 09:11:00 +0000",
 			"Sun, 08 Dec 1991 09:11:00 +0000",
 			"Thu, 26 Dec 1991 20:45:00 +0000",
 			"Tue, 09 Jun 1992 03:45:24 +0000",
@@ -64,22 +69,46 @@ namespace UnitTests {
 			"Tue, 17 Jun 2008 17:10:08 +0000",
 			"Fri, 30 Nov 2012 02:09:10 +0100",
 			"Tue, 11 Feb 2014 22:27:10 +0100",
-			"Wed, 06 Aug 2014 01:53:48 +0200",
-			"Tue, 21 Apr 2015 14:44:51 +0000"
+			"Wed, 06 Aug 2014 01:53:48 +0000",
+			"Tue, 21 Apr 2015 14:44:51 +0000",
+			"Tue, 21 Apr 2015 14:44:51 +0000",
+			"Thu, 01 Oct 2015 14:40:57 +0200",
+			"Tue, 12 Jun 2012 19:22:28 +0200"
 		};
 
 		[Test]
 		public void TestDateParser ()
 		{
+			DateTimeOffset date;
+			string parsed;
+			byte[] text;
+
 			for (int i = 0; i < dates.Length; i++) {
-				var text = Encoding.UTF8.GetBytes (dates[i]);
-				DateTimeOffset date;
+				text = Encoding.UTF8.GetBytes (dates[i]);
 
 				Assert.IsTrue (DateUtils.TryParse (text, 0, text.Length, out date), "Failed to parse date: {0}", dates[i]);
-				var parsed = DateUtils.FormatDate (date);
+				parsed = DateUtils.FormatDate (date);
+				Assert.AreEqual (expected[i], parsed, "Parsed date does not match: '{0}' vs '{1}'", parsed, expected[i]);
 
+				Assert.IsTrue (DateUtils.TryParse (text, 0, out date), "Failed to parse date: {0}", dates[i]);
+				parsed = DateUtils.FormatDate (date);
+				Assert.AreEqual (expected[i], parsed, "Parsed date does not match: '{0}' vs '{1}'", parsed, expected[i]);
+
+				Assert.IsTrue (DateUtils.TryParse (text, out date), "Failed to parse date: {0}", dates[i]);
+				parsed = DateUtils.FormatDate (date);
+				Assert.AreEqual (expected[i], parsed, "Parsed date does not match: '{0}' vs '{1}'", parsed, expected[i]);
+
+				Assert.IsTrue (DateUtils.TryParse (dates[i], out date), "Failed to parse date: {0}", dates[i]);
+				parsed = DateUtils.FormatDate (date);
 				Assert.AreEqual (expected[i], parsed, "Parsed date does not match: '{0}' vs '{1}'", parsed, expected[i]);
 			}
+
+			text = Encoding.ASCII.GetBytes ("this is pure junk");
+
+			Assert.IsFalse (DateUtils.TryParse (text, 0, text.Length, out date), "Should not have parsed junk.");
+			Assert.IsFalse (DateUtils.TryParse (text, 0, out date), "Should not have parsed junk.");
+			Assert.IsFalse (DateUtils.TryParse (text, out date), "Should not have parsed junk.");
+			Assert.IsFalse (DateUtils.TryParse ("this is pure junk", out date), "Should not have parsed junk.");
 		}
 	}
 }

@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -575,6 +575,9 @@ namespace MimeKit.Cryptography {
 				case EncryptionAlgorithm.Des:
 					capabilities.AddCapability (SmimeCapabilities.DesCbc);
 					break;
+				case EncryptionAlgorithm.Blowfish:
+				case EncryptionAlgorithm.Twofish:
+					break;
 				}
 			}
 
@@ -813,57 +816,57 @@ namespace MimeKit.Cryptography {
 			if (identifier == null)
 				throw new ArgumentNullException ("identifier");
 
-			if (identifier.ObjectID.Id == CmsEnvelopedGenerator.Aes256Cbc) {
+			if (identifier.Algorithm.Id == CmsEnvelopedGenerator.Aes256Cbc) {
 				algorithm = EncryptionAlgorithm.Aes256;
 				return true;
 			}
 
-			if (identifier.ObjectID.Id == CmsEnvelopedGenerator.Aes192Cbc) {
+			if (identifier.Algorithm.Id == CmsEnvelopedGenerator.Aes192Cbc) {
 				algorithm = EncryptionAlgorithm.Aes192;
 				return true;
 			}
 
-			if (identifier.ObjectID.Id == CmsEnvelopedGenerator.Aes128Cbc) {
+			if (identifier.Algorithm.Id == CmsEnvelopedGenerator.Aes128Cbc) {
 				algorithm = EncryptionAlgorithm.Aes128;
 				return true;
 			}
 
-			if (identifier.ObjectID.Id == CmsEnvelopedGenerator.Camellia256Cbc) {
+			if (identifier.Algorithm.Id == CmsEnvelopedGenerator.Camellia256Cbc) {
 				algorithm = EncryptionAlgorithm.Camellia256;
 				return true;
 			}
 
-			if (identifier.ObjectID.Id == CmsEnvelopedGenerator.Camellia192Cbc) {
+			if (identifier.Algorithm.Id == CmsEnvelopedGenerator.Camellia192Cbc) {
 				algorithm = EncryptionAlgorithm.Camellia192;
 				return true;
 			}
 
-			if (identifier.ObjectID.Id == CmsEnvelopedGenerator.Camellia128Cbc) {
+			if (identifier.Algorithm.Id == CmsEnvelopedGenerator.Camellia128Cbc) {
 				algorithm = EncryptionAlgorithm.Camellia128;
 				return true;
 			}
 
-			if (identifier.ObjectID.Id == CmsEnvelopedGenerator.Cast5Cbc) {
+			if (identifier.Algorithm.Id == CmsEnvelopedGenerator.Cast5Cbc) {
 				algorithm = EncryptionAlgorithm.Cast5;
 				return true;
 			}
 
-			if (identifier.ObjectID.Id == CmsEnvelopedGenerator.DesEde3Cbc) {
+			if (identifier.Algorithm.Id == CmsEnvelopedGenerator.DesEde3Cbc) {
 				algorithm = EncryptionAlgorithm.TripleDes;
 				return true;
 			}
 
-			if (identifier.ObjectID.Id == SmimeCapability.DesCbc.Id) {
+			if (identifier.Algorithm.Id == SmimeCapability.DesCbc.Id) {
 				algorithm = EncryptionAlgorithm.Des;
 				return true;
 			}
 
-			if (identifier.ObjectID.Id == CmsEnvelopedGenerator.IdeaCbc) {
+			if (identifier.Algorithm.Id == CmsEnvelopedGenerator.IdeaCbc) {
 				algorithm = EncryptionAlgorithm.Idea;
 				return true;
 			}
 
-			if (identifier.ObjectID.Id == CmsEnvelopedGenerator.RC2Cbc) {
+			if (identifier.Algorithm.Id == CmsEnvelopedGenerator.RC2Cbc) {
 				var param = (DerInteger) identifier.Parameters;
 				int bits = param.Value.IntValue;
 
@@ -888,7 +891,18 @@ namespace MimeKit.Cryptography {
 			}
 		}
 
-		DigitalSignatureCollection GetDigitalSignatures (CmsSignedDataParser parser)
+		/// <summary>
+		/// Gets the list of digital signatures.
+		/// </summary>
+		/// <remarks>
+		/// <para>Gets the list of digital signatures.</para>
+		/// <para>This method is useful to call from within any custom
+		/// <a href="Overload_MimeKit_Cryptography_SecureMimeContext_Verify.htm">Verify</a>
+		/// method that you may implement in your own class.</para>
+		/// </remarks>
+		/// <returns>The digital signatures.</returns>
+		/// <param name="parser">The CMS signed data parser.</param>
+		protected DigitalSignatureCollection GetDigitalSignatures (CmsSignedDataParser parser)
 		{
 			var certificates = parser.GetCertificates ("Collection");
 			var signatures = new List<IDigitalSignature> ();
@@ -953,10 +967,10 @@ namespace MimeKit.Cryptography {
 		}
 
 		/// <summary>
-		/// Verifies the specified content using the detached signatureData.
+		/// Verify the specified content using the detached signature data.
 		/// </summary>
 		/// <remarks>
-		/// Verifies the specified content using the detached signatureData.
+		/// Verifies the specified content using the detached signature data.
 		/// </remarks>
 		/// <returns>A list of the digital signatures.</returns>
 		/// <param name="content">The content.</param>
@@ -978,23 +992,27 @@ namespace MimeKit.Cryptography {
 				throw new ArgumentNullException ("signatureData");
 
 			var parser = new CmsSignedDataParser (new CmsTypedStream (content), signatureData);
+			var signed = parser.GetSignedContent ();
 
-			parser.GetSignedContent ().Drain ();
+			signed.Drain ();
 
 			return GetDigitalSignatures (parser);
 		}
 
 		/// <summary>
-		/// Verifies the digital signatures of the specified signedData and extract the original content.
+		/// Verify the digital signatures of the specified signed data and extract the original content.
 		/// </summary>
 		/// <remarks>
-		/// Verifies the digital signatures of the specified signedData and extract the original content.
+		/// Verifies the digital signatures of the specified signed data and extracts the original content.
 		/// </remarks>
 		/// <returns>The list of digital signatures.</returns>
 		/// <param name="signedData">The signed data.</param>
-		/// <param name="entity">The unencapsulated entity.</param>
+		/// <param name="entity">The extracted MIME entity.</param>
 		/// <exception cref="System.ArgumentNullException">
 		/// <paramref name="signedData"/> is <c>null</c>.
+		/// </exception>
+		/// <exception cref="System.FormatException">
+		/// The extracted content could not be parsed as a MIME entity.
 		/// </exception>
 		/// <exception cref="Org.BouncyCastle.Cms.CmsException">
 		/// An error occurred in the cryptographic message syntax subsystem.
@@ -1008,8 +1026,42 @@ namespace MimeKit.Cryptography {
 			var signed = parser.GetSignedContent ();
 
 			entity = MimeEntity.Load (signed.ContentStream);
+			signed.Drain ();
 
 			return GetDigitalSignatures (parser);
+		}
+
+		/// <summary>
+		/// Verify the digital signatures of the specified signed data and extract the original content.
+		/// </summary>
+		/// <remarks>
+		/// Verifies the digital signatures of the specified signed data and extracts the original content.
+		/// </remarks>
+		/// <returns>The extracted content stream.</returns>
+		/// <param name="signedData">The signed data.</param>
+		/// <param name="signatures">The digital signatures.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="signedData"/> is <c>null</c>.
+		/// </exception>
+		/// <exception cref="Org.BouncyCastle.Cms.CmsException">
+		/// An error occurred in the cryptographic message syntax subsystem.
+		/// </exception>
+		public Stream Verify (Stream signedData, out DigitalSignatureCollection signatures)
+		{
+			if (signedData == null)
+				throw new ArgumentNullException ("signedData");
+
+			var parser = new CmsSignedDataParser (signedData);
+			var signed = parser.GetSignedContent ();
+			var content = new MemoryBlockStream ();
+
+			signed.ContentStream.CopyTo (content, 4096);
+			content.Position = 0;
+			signed.Drain ();
+
+			signatures = GetDigitalSignatures (parser);
+
+			return content;
 		}
 
 		class VoteComparer : IComparer<int>
@@ -1297,7 +1349,7 @@ namespace MimeKit.Cryptography {
 			var memory = new MemoryBlockStream ();
 
 			cms.AddCertificates (certificates);
-			cms.Open (memory).Close ();
+			cms.Open (memory).Dispose ();
 			memory.Position = 0;
 
 			return new ApplicationPkcs7Mime (SecureMimeType.CertsOnly, memory);

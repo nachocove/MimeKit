@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2016 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -27,6 +27,8 @@
 using System;
 using System.Collections.Generic;
 
+using MimeKit.Utils;
+
 namespace MimeKit {
 	/// <summary>
 	/// A mapping of file name extensions to the corresponding MIME-type.
@@ -40,7 +42,7 @@ namespace MimeKit {
 
 		static MimeTypes ()
 		{
-			mimeTypes = new Dictionary<string, string> (StringComparer.OrdinalIgnoreCase);
+			mimeTypes = new Dictionary<string, string> (MimeUtils.OrdinalIgnoreCase);
 			mimeTypes.Add ("323", "text/h323");
 			mimeTypes.Add ("3dmf", "x-world/x-3dmf");
 			mimeTypes.Add ("3dm", "x-world/x-3dmf");
